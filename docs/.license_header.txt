@@ -1,0 +1,4 @@
+Copyright (c) 2022 {{ OWNER_COMPANY }}
+
+This file is a part of tl package.
+See {{ LICENSE_URL }} for details.

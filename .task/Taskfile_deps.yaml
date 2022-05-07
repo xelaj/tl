@@ -1,0 +1,17 @@
+version: 3
+
+tasks:
+  golangci-lint:
+    cmds:
+      - which golangci-lint > /dev/null || (echo -e golangci-lint is not installed && exit 1)
+    silent: true
+
+  go:
+    cmds:
+      - which go > /dev/null || (echo -e go tools are not installed && exit 1)
+    silent: true
+
+  gotest:
+    cmds:
+      - which gotest > /dev/null || (echo -e github.com/rakyll/gotest is not installed && exit 1)
+    silent: true

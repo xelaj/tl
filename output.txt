@@ -1,0 +1,1345 @@
+extra.go:20:6: `ptr` is unused (deadcode)
+func ptr[T any](value T) *T { return &value }
+     ^
+object.go:21:2: `uint32Type` is unused (deadcode)
+	uint32Type     = reflect.TypeOf((*uint32)(nil)).Elem()
+	^
+registry.go:55:6: `interfaceImplementations` is unused (deadcode)
+type interfaceImplementations map[string]map[crc32]null
+     ^
+common_types.go:33:15: Error return value of `e.PutRawBytes` is not checked (errcheck)
+	e.PutRawBytes(bigIntBytes(&i.Int, Int128Len*bitsInByte))
+	             ^
+common_types.go:71:15: Error return value of `e.PutRawBytes` is not checked (errcheck)
+	e.PutRawBytes(bigIntBytes(&i.Int, Int256Len*bitsInByte))
+	             ^
+decoder.go:81: Function 'decodeValue' has too many statements (52 > 50) (funlen)
+func (d *Decoder) decodeValue(value reflect.Value) error {
+decoder.go:250:1: cognitive complexity 32 of func `(*Decoder).decodeObject` is high (> 30) (gocognit)
+func (d *Decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
+^
+encoder.go:27:1: cyclomatic complexity 18 of func `(*Encoder).encodeValue` is high (> 15) (gocyclo)
+func (c *Encoder) encodeValue(value reflect.Value) error {
+^
+encoder.go:90:1: cyclomatic complexity 17 of func `(*Encoder).encodeStruct` is high (> 15) (gocyclo)
+func (c *Encoder) encodeStruct(v reflect.Value) error {
+^
+encoder.go:167:1: cyclomatic complexity 17 of func `(*Encoder).encodeMap` is high (> 15) (gocyclo)
+func (c *Encoder) encodeMap(m reflect.Value) error {
+^
+common_types.go:13:57: Comment should end in a period (godot)
+// cause native big.Int isn't supported for en(de)coding
+                                                        ^
+common_types.go:18:44: Comment should end in a period (godot)
+// NewInt128 creates int128 with zero value
+                                           ^
+common_types.go:24:46: Comment should end in a period (godot)
+// NewInt128 creates int128 with random value
+                                             ^
+decoder.go:160: decoder.go:160: Line contains TODO/BUG/FIXME: "TODO: must implement map decoding" (godox)
+		// TODO: must implement map decoding
+encoder.go:179: encoder.go:179: Line contains TODO/BUG/FIXME: "TODO: need to cache encoded non empty ob..." (godox)
+	// TODO: need to cache encoded non empty objects in slice, then write everything after we will be sure
+encoder.go:243: File is not `gofmt`-ed with `-s` (gofmt)
+
+flags.go:2: File is not `gofmt`-ed with `-s` (gofmt)
+
+
+object.go:46: File is not `gofmt`-ed with `-s` (gofmt)
+
+flags.go:3: File is not `gofumpt`-ed (gofumpt)
+
+
+object.go:47: File is not `gofumpt`-ed (gofumpt)
+
+common_types.go:1:21: Actual: 0-2021 KHS Films
+Expected:2 {{ OWNER_COMPANY }} (goheader)
+// Copyright (c) 2020-2021 KHS Films
+                    ^
+const.go:1:21: Actual: 0-2021 KHS Films
+Expected:2 {{ OWNER_COMPANY }} (goheader)
+// Copyright (c) 2020-2021 KHS Films
+                    ^
+decoder.go:1:21: Actual: 0-2021 KHS Films
+Expected:2 {{ OWNER_COMPANY }} (goheader)
+// Copyright (c) 2020-2021 KHS Films
+                    ^
+errors.go:1:13: Actual: £ (c) 2020-2021 KHS Films
+Expected: (c) 2022 {{ OWNER_COMPANY }} (goheader)
+// Copyright£ (c) 2020-2021 KHS Films
+            ^
+flags.go:1: Missed header for check (goheader)
+package tl
+tag.go:1: Missed header for check (goheader)
+package tl
+registry.go:98: line is 146 characters (lll)
+// для энкдоинга это не так важно, здесь проблем никаких нет. Регистр хоть и используется, но лишь для оптимизации, что бы не парсить 300 раз теги
+errors.go:24:7: unused-receiver: method receiver 'e' is not referenced in method's body, consider removing or renaming it as _ (revive)
+func (e ErrMustParseSlicesExplicitly) Error() string {
+      ^
+errors.go:39:7: unused-receiver: method receiver 'e' is not referenced in method's body, consider removing or renaming it as _ (revive)
+func (e ErrImplicitInteger) Error() string {
+      ^
+errors.go:69:7: unused-receiver: method receiver 'e' is not referenced in method's body, consider removing or renaming it as _ (revive)
+func (e ErrUnexpectedNil) Error() string {
+      ^
+encoder_basic.go:55:26: flag-parameter: parameter 'v' seems to be a control flag, avoid control coupling (revive)
+func (e *Encoder) PutBool(v bool) error {
+                         ^
+encoder_basic.go:30:15: add-constant: avoid magic numbers like '0', create a named constant for it (revive)
+	if len(b) == 0 {
+	             ^
+encoder_basic.go:46:23: add-constant: avoid magic numbers like '0', create a named constant for it (revive)
+	if len(b)%WordLen != 0 {
+	                     ^
+encoder_basic.go:140:1: function-length: maximum number of statements per function exceeded; max 10 but got 11 (revive)
+func (e *Encoder) putLargeBytes(msg []byte) error {
+	if len(msg) < FuckingMagicNumber {
+		// it's panicing, cause, you shouldn' call this func by your
+		// hands. panic required for internal purposes
+		panic("can't save binary stream with length less than 253 bytes")
+	}
+
+	const maxLen = 1 << ((WordLen - 1) * bitsInByte) // 3 left bytes of word, which is 4 bytes
+	if len(msg) > maxLen {
+		return fmt.Errorf("message entity too large: expect less than %v, got %v", maxLen, len(msg))
+	}
+
+	const byteStreamLengthSize = 4
+
+	for _, elem := range [][]byte{
+		{FuckingMagicNumber},
+		littleUint24Bytes(len(msg)),
+		msg,
+		make([]byte, pad(byteStreamLengthSize, WordLen, len(msg))),
+	} {
+		err := e.write(elem)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+utils.go:20:27: add-constant: avoid magic numbers like '11', create a named constant for it (revive)
+	if bitsizeSquaredFloat > 11 {
+	                         ^
+registry.go:129:1: cognitive-complexity: function (*Registry).registerObject has cognitive complexity 22 (> max enabled 7) (revive)
+func (r *Registry) registerObject(o Object) {
+	if o == nil {
+		panic("object is nil")
+	}
+
+	typ := reflect.TypeOf(o)
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+	}
+	typData := structFields{
+		tags:     make([]structTag, typ.NumField()),
+		bitflags: make(map[int]bitflagBit),
+	}
+
+	tagNamesIndexes := make(map[string]int, typ.NumField())
+	for i := 0; i < typ.NumField(); i++ {
+		fTyp := typ.Field(i)
+		typName := typ.Name() + "." + fTyp.Name
+
+		tag, err := parseTag(fTyp.Tag.Get(tagName), fTyp.Name)
+		if err != nil {
+			panic(fmt.Sprintf("parsing tag of %v: %v", typName, err.Error()))
+		}
+		tagNamesIndexes[tag.Name] = i
+
+		if tag.BitFlags != nil {
+			targetField, ok := tagNamesIndexes[tag.BitFlags.TargetField]
+			if !ok {
+				panic(fmt.Sprintf("%v: field is optional, but bitflags indicating that this field became after exact field", typName))
+			}
+
+			switch fTyp.Type.Kind() {
+			case reflect.Bool, reflect.Ptr, reflect.Interface, reflect.Slice:
+			default:
+				// enum is specific case, 0 value is always null
+				if fTyp.Type.Implements(enumTyp) {
+					break
+				}
+				panic(fmt.Sprintf("%v: field tagged as omitempty, but kind is not pointer to value or bool", typName))
+			}
+
+			typData.bitflags[i] = bitflagBit{
+				fieldIndex: targetField,
+				bitIndex:   int(tag.BitFlags.BitPosition),
+			}
+
+			if tag.Implicit() && fTyp.Type.Kind() != reflect.Bool {
+				panic(fmt.Sprintf("%v: %q tag works only for boolean fields", typName, implicitFlag))
+			}
+		}
+
+		typData.tags[i] = *tag
+	}
+
+	if r.structFields == nil {
+		r.structFields = make(map[crc32]structFields)
+	}
+	r.structFields[o.CRC()] = typData
+	r.pushObject(o.CRC(), typ)
+}
+decoder_basic.go:181:3: empty-lines: extra empty line at the end of a block (revive)
+		if err != nil {
+			return nil, errors.Wrapf(err, "reading %v last void bytes", p)
+		}
+utils.go:27:20: add-constant: avoid magic numbers like '8', create a named constant for it (revive)
+	offset := bitsize/8 - vbytesLen
+	                  ^
+registry.go:33:44: add-constant: avoid magic numbers like '1', create a named constant for it (revive)
+		r.objects = make(map[crc32]reflect.Type, 1)
+		                                         ^
+utils.go:28:14: add-constant: avoid magic numbers like '0', create a named constant for it (revive)
+	if offset < 0 {
+	            ^
+registry.go:202:35: add-constant: avoid magic numbers like '1', create a named constant for it (revive)
+		r.enums = make(map[uint32]Enum, 1)
+		                                ^
+utils.go:43:13: add-constant: avoid magic numbers like '8', create a named constant for it (revive)
+		byte(v >> 8),
+		          ^
+registry.go:207:43: add-constant: avoid magic numbers like '1', create a named constant for it (revive)
+		r.enumStrings = make(map[uint32]string, 1)
+		                                        ^
+utils.go:44:13: add-constant: avoid magic numbers like '16', create a named constant for it (revive)
+		byte(v >> 16),
+		          ^
+utils.go:15:1: function-length: maximum number of statements per function exceeded; max 10 but got 11 (revive)
+func bigIntBytes(v *big.Int, bitsize int) []byte {
+	bitsizeSquaredFloat := math.Log2(float64(bitsize))
+	if !isInt(bitsizeSquaredFloat) {
+		panic(fmt.Errorf("bitsize not squaring by 2: bitsize %v", bitsize))
+	}
+	if bitsizeSquaredFloat > 11 {
+		panic(fmt.Errorf("bitsize is larger than 2048 bit: bitsize %v", bitsize))
+	}
+
+	vbytes := v.Bytes()
+	vbytesLen := len(vbytes)
+
+	offset := bitsize/8 - vbytesLen
+	if offset < 0 {
+		panic(fmt.Errorf("bitsize too small: have %v, want at least %v", bitsize, vbytes))
+	}
+
+	return append(make([]byte, offset), vbytes...)
+}
+decoder.go:180:1: cognitive-complexity: function (*Decoder).decodeVector has cognitive complexity 12 (> max enabled 7) (revive)
+func (d *Decoder) decodeVector(v reflect.Value, ignoreCRC bool) error {
+	if !ignoreCRC {
+		crc, err := d.PopCRC()
+		if err != nil {
+			return errors.Wrap(err, "read crc")
+		}
+
+		if crc != CrcVector {
+			return fmt.Errorf("not a vector: 0x%08x, want: 0x%08x", crc, CrcVector)
+		}
+	}
+
+	size, err := d.PopUint()
+	if err != nil {
+		return errors.Wrap(err, "read vector size")
+	}
+
+	switch v.Kind() {
+	case reflect.Array:
+		if v.Len() < int(size) {
+			return fmt.Errorf("array size is smaller than message: got %v, want %v", v.Len(), size)
+		}
+	case reflect.Slice:
+		v.Set(reflect.MakeSlice(v.Type(), int(size), int(size)))
+	}
+
+	for i := 0; i < int(size); i++ {
+		if err := d.decodeValue(v.Index(i)); err != nil {
+			return wrapPath(err, "["+strconv.Itoa(i)+"]")
+		}
+	}
+
+	return nil
+}
+tag.go:63:1: cognitive-complexity: function parseTag has cognitive complexity 17 (> max enabled 7) (revive)
+func parseTag(tag, defaultName string) (*structTag, error) {
+	parts := strings.Split(tag, ",")
+	name := parts[0]
+	if name == "" {
+		name = defaultName
+	}
+
+	var optionalField *bitflag
+	var isBitflag bool
+	for _, option := range parts[1:] {
+		switch {
+		case option == implicitFlag:
+			if optionalField == nil {
+				optionalField = &bitflag{}
+			}
+			optionalField.Implicit = true
+			continue
+
+		case option == isBitflagFlag:
+			isBitflag = true
+
+		case strings.HasPrefix(option, omitemptyPrefix):
+			parts := strings.Split(option, ":")
+			if len(parts) != 3 {
+				return nil, fmt.Errorf("%v: invalid flag format, got %q", omitemptyPrefix, option)
+			}
+
+			if optionalField == nil {
+				optionalField = &bitflag{}
+			}
+
+			optionalField.TargetField = parts[1]
+			pos, err := strconv.ParseUint(parts[2], 10, 5)
+			if err != nil {
+				return nil, fmt.Errorf("%v: invalid flag format, got %q", omitemptyPrefix, option)
+			}
+			optionalField.BitPosition = uint8(pos)
+
+		default:
+			return nil, fmt.Errorf("invalid option %q", option)
+		}
+	}
+	if err := optionalField.valid(); err != nil {
+		return nil, err
+	}
+
+	return &structTag{
+		Name:      name,
+		BitFlags:  optionalField,
+		IsBitflag: isBitflag,
+	}, nil
+}
+tag.go:38:73: add-constant: avoid magic numbers like '10', create a named constant for it (revive)
+	res := t.TargetField + ":" + strconv.FormatUint(uint64(t.BitPosition), 10)
+	                                                                       ^
+tag.go:40:10: add-constant: string literal "," appears, at least, 3 times, create a named constant for it (revive)
+		res += "," + implicitFlag
+		       ^
+tag.go:49:22: add-constant: avoid magic numbers like '32', create a named constant for it (revive)
+	if t.BitPosition >= 32 {
+	                    ^
+decoder_basic.go:140:1: cognitive-complexity: function (*Decoder).PopMessage has cognitive complexity 10 (> max enabled 7) (revive)
+func (d *Decoder) PopMessage() ([]byte, error) {
+	readLen := 1
+	buf, err := d.peek(1)
+	if err != nil {
+		return nil, err
+	}
+	firstByte := buf[0]
+
+	// how exact bytes there is a message
+	var realSize int
+
+	if firstByte != FuckingMagicNumber { // tiny message, so real size is exact a first byte value
+		realSize = int(firstByte)
+	} else { // otherwise it's a large message, next three bytes are size of message
+		readLen += WordLen - 1
+		buf, err := d.peek(WordLen - 1)
+		if err != nil {
+			return nil, errors.Wrapf(err, "reading last %v bytes of message size", WordLen-1)
+		}
+
+		switch d.endianess {
+		case binary.LittleEndian:
+			buf = append(buf, 0x00)
+		case binary.BigEndian:
+			buf = append([]byte{0x00}, buf...)
+		default:
+			panic("wait, what?")
+		}
+
+		realSize = int(d.endianess.Uint32(buf))
+	}
+
+	// this buf wil be real message
+	buf, err = d.peek(realSize)
+	if err != nil {
+		return nil, errors.Wrapf(err, "reading message data with len of %v", realSize)
+	}
+
+	p := pad(readLen, WordLen, realSize)
+	if p > 0 {
+		_, err = d.peek(p)
+		if err != nil {
+			return nil, errors.Wrapf(err, "reading %v last void bytes", p)
+		}
+
+	}
+
+	d.success()
+	return buf, nil
+}
+tag.go:86:21: add-constant: avoid magic numbers like '3', create a named constant for it (revive)
+			if len(parts) != 3 {
+			                 ^
+tag.go:95:40: add-constant: avoid magic numbers like '2', create a named constant for it (revive)
+			pos, err := strconv.ParseUint(parts[2], 10, 5)
+			                                    ^
+decoder.go:268:28: add-constant: string literal "read crc" appears, at least, 3 times, create a named constant for it (revive)
+			return errors.Wrap(err, "read crc")
+			                        ^
+decoder_basic.go:162:22: add-constant: avoid magic numbers like '0x00', create a named constant for it (revive)
+			buf = append(buf, 0x00)
+			                  ^
+decoder_basic.go:164:24: add-constant: avoid magic numbers like '0x00', create a named constant for it (revive)
+			buf = append([]byte{0x00}, buf...)
+			                    ^
+decoder.go:47:1: function-length: maximum number of statements per function exceeded; max 10 but got 18 (revive)
+func (d *Decoder) DecodeUnknown() (any, error) {
+	crc, err := d.PopCRC()
+	if err != nil {
+		return nil, errors.Wrap(err, "getting crc code of decoded object")
+	}
+
+	switch crc {
+	case CrcVector:
+		return nil, errors.New("got vector, not allowed to decode it manually")
+	case CrcFalse:
+		return false, nil
+	case CrcTrue:
+		return true, nil
+	case CrcNull:
+		return nil, nil
+	}
+
+	enum, ok := d.registry.enums[crc]
+	if ok {
+		return enum, nil
+	}
+
+	object, err := d.registry.spawnObject(crc)
+	if err != nil {
+		return nil, err
+	}
+
+	err = d.decodeObject(object, true)
+	if err != nil {
+		return nil, err
+	}
+	return object.Interface(), nil
+}
+decoder.go:215:1: function-length: maximum number of statements per function exceeded; max 10 but got 11 (revive)
+func (d *Decoder) decodeInterface(v reflect.Value) error {
+	crc, err := d.PopCRC()
+	if err != nil {
+		return errors.Wrap(err, "read crc")
+	}
+
+	o, err := d.registry.spawnObject(crc)
+	if err != nil {
+		return err
+	}
+
+	err = d.decodeObject(o, true)
+	if err != nil {
+		return err // no need to wrap
+	}
+	v.Set(o)
+
+	return nil
+}
+decoder_basic.go:184: unnecessary trailing newline (whitespace)
+
+	}
+decoder.go:17:6: the type name `ErrOutIsNil` should conform to the `XxxError` format (errname)
+type ErrOutIsNil struct{}
+     ^
+decoder.go:345:6: the type name `ErrPath` should conform to the `XxxError` format (errname)
+type ErrPath struct {
+     ^
+errors.go:13:6: the type name `ErrRegisteredObjectNotFound` should conform to the `XxxError` format (errname)
+type ErrRegisteredObjectNotFound struct {
+     ^
+errors.go:22:6: the type name `ErrMustParseSlicesExplicitly` should conform to the `XxxError` format (errname)
+type ErrMustParseSlicesExplicitly null
+     ^
+errors.go:28:6: the type name `ErrorPartialWrite` should conform to the `XxxError` format (errname)
+type ErrorPartialWrite struct {
+     ^
+errors.go:37:6: the type name `ErrImplicitInteger` should conform to the `XxxError` format (errname)
+type ErrImplicitInteger struct{}
+     ^
+errors.go:43:6: the type name `ErrUnsupportedInt` should conform to the `XxxError` format (errname)
+type ErrUnsupportedInt struct {
+     ^
+errors.go:51:6: the type name `ErrUnsupportedFloat` should conform to the `XxxError` format (errname)
+type ErrUnsupportedFloat struct {
+     ^
+errors.go:59:6: the type name `ErrUnsupportedType` should conform to the `XxxError` format (errname)
+type ErrUnsupportedType struct {
+     ^
+errors.go:67:6: the type name `ErrUnexpectedNil` should conform to the `XxxError` format (errname)
+type ErrUnexpectedNil struct{}
+     ^
+decoder.go:357:16: type assertion on error will fail on wrapped errors. Use errors.As to check for specific errors (errorlint)
+	if err, ok := err.(ErrPath); ok {
+	              ^
+decoder.go:98:2: missing cases in switch of type reflect.Kind: Invalid (exhaustive)
+	switch kind := value.Kind(); kind {
+	^
+decoder.go:197:2: missing cases in switch of type reflect.Kind: Bool, Chan, Complex128, Complex64, Float32, Float64, Func, Int, Int16, Int32, Int64, Int8, Interface, Invalid, Map, Pointer|Ptr, String, Struct, Uint, Uint16, Uint32, Uint64, Uint8, Uintptr, UnsafePointer (exhaustive)
+	switch v.Kind() {
+	^
+encoder.go:32:2: missing cases in switch of type reflect.Kind: Array, Chan, Func, Invalid, Uintptr, UnsafePointer (exhaustive)
+	switch k := value.Type().Kind(); k { //nolint:exhaustive has default case
+	^
+registry.go:160:4: missing cases in switch of type reflect.Kind: Array, Chan, Complex128, Complex64, Float32, Float64, Func, Int, Int16, Int32, Int64, Int8, Invalid, Map, String, Struct, Uint, Uint16, Uint32, Uint64, Uint8, Uintptr, UnsafePointer (exhaustive)
+			switch fTyp.Type.Kind() {
+			^
+decoder.go:83:10: type assertion must be checked (forcetypeassert)
+		return value.Interface().(Unmarshaler).UnmarshalTL(d)
+		       ^
+decoder.go:342:9: type assertion must be checked (forcetypeassert)
+	return v.Interface().(Object).CRC(), true
+	       ^
+encoder.go:29:10: type assertion must be checked (forcetypeassert)
+		return value.Interface().(Marshaler).MarshalTL(c)
+		       ^
+encoder.go:154:5: uintType is a global variable (gochecknoglobals)
+var uintType = reflect.TypeOf(uint32(0))
+    ^
+object.go:16:2: byteSliceTyp is a global variable (gochecknoglobals)
+	byteSliceTyp   = reflect.TypeOf((*[]byte)(nil)).Elem()
+	^
+object.go:17:2: marshalerTyp is a global variable (gochecknoglobals)
+	marshalerTyp   = reflect.TypeOf((*Marshaler)(nil)).Elem()
+	^
+object.go:18:2: unmarshalerTyp is a global variable (gochecknoglobals)
+	unmarshalerTyp = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
+	^
+object.go:19:2: objectTyp is a global variable (gochecknoglobals)
+	objectTyp      = reflect.TypeOf((*Object)(nil)).Elem()
+	^
+object.go:20:2: enumTyp is a global variable (gochecknoglobals)
+	enumTyp        = reflect.TypeOf((*Enum)(nil)).Elem()
+	^
+registry.go:95:5: defaultRegistry is a global variable (gochecknoglobals)
+var defaultRegistry = &Registry{}
+    ^
+decoder.go:38:10: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"res value is not pointer as expected. got %v\", v.Type())" (goerr113)
+		return fmt.Errorf("res value is not pointer as expected. got %v", v.Type())
+		       ^
+decoder.go:108:10: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"int kind: %v (must converted to int32, int64 or uint32 explicitly)\", kind)" (goerr113)
+		return fmt.Errorf("int kind: %v (must converted to int32, int64 or uint32 explicitly)", kind)
+		       ^
+decoder.go:112:10: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"float kind: %s (must be converted to float64 explicitly)\", kind)" (goerr113)
+		return fmt.Errorf("float kind: %s (must be converted to float64 explicitly)", kind)
+		       ^
+decoder.go:188:11: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"not a vector: 0x%08x, want: 0x%08x\", crc, CrcVector)" (goerr113)
+			return fmt.Errorf("not a vector: 0x%08x, want: 0x%08x", crc, CrcVector)
+			       ^
+decoder.go:200:11: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"array size is smaller than message: got %v, want %v\", v.Len(), size)" (goerr113)
+			return fmt.Errorf("array size is smaller than message: got %v, want %v", v.Len(), size)
+			       ^
+decoder.go:238:10: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"enum 0x%08x not found\", crc)" (goerr113)
+		return fmt.Errorf("enum 0x%08x not found", crc)
+		       ^
+decoder.go:242:10: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"invalid type of enum: want %v, got %v\", v.Type(), value.Type())" (goerr113)
+		return fmt.Errorf("invalid type of enum: want %v, got %v", v.Type(), value.Type())
+		       ^
+decoder.go:262:10: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"object 0x%08x is not registered\", crc)" (goerr113)
+		return fmt.Errorf("object 0x%08x is not registered", crc)
+		       ^
+decoder.go:272:11: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"invalid crc code: got 0x%08x; want 0x%08x\", gotCrc, crc)" (goerr113)
+			return fmt.Errorf("invalid crc code: got 0x%08x; want 0x%08x", gotCrc, crc)
+			       ^
+decoder.go:278:10: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"expected struct, got %v with %v kind\", v.Type(), v.Kind())" (goerr113)
+		return fmt.Errorf("expected struct, got %v with %v kind", v.Type(), v.Kind())
+		       ^
+decoder_basic.go:119:17: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"want a 0x%08x (true) or 0x%08x (false); got 0x%08x\", CrcTrue, CrcFalse, crc)" (goerr113)
+		return false, fmt.Errorf("want a 0x%08x (true) or 0x%08x (false); got 0x%08x", CrcTrue, CrcFalse, crc)
+		              ^
+encoder.go:175:10: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"crc code %08x is not found in registry\", crc)" (goerr113)
+		return fmt.Errorf("crc code %08x is not found in registry", crc)
+		       ^
+encoder.go:193:11: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"field %q is required for this type\", field.name)" (goerr113)
+			return fmt.Errorf("field %q is required for this type", field.name)
+			       ^
+encoder_basic.go:47:10: err113: do not define dynamic errors, use wrapped static errors instead: "errors.New(\"raw bytes does not divide by word size of protocol\")" (goerr113)
+		return errors.New("raw bytes does not divide by word size of protocol")
+		       ^
+encoder_basic.go:149:10: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"message entity too large: expect less than %v, got %v\", maxLen, len(msg))" (goerr113)
+		return fmt.Errorf("message entity too large: expect less than %v, got %v", maxLen, len(msg))
+		       ^
+registry.go:42:27: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"object with crc 0x%08x not found\", crc)" (goerr113)
+		return reflect.Value{}, fmt.Errorf("object with crc 0x%08x not found", crc)
+		                        ^
+tag.go:50:10: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"trigger bit is too high: %v\", t.BitPosition)" (goerr113)
+		return fmt.Errorf("trigger bit is too high: %v", t.BitPosition)
+		       ^
+tag.go:53:10: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"%q defined without target field to trigger\", implicitFlag)" (goerr113)
+		return fmt.Errorf("%q defined without target field to trigger", implicitFlag)
+		       ^
+tag.go:87:17: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"%v: invalid flag format, got %q\", omitemptyPrefix, option)" (goerr113)
+				return nil, fmt.Errorf("%v: invalid flag format, got %q", omitemptyPrefix, option)
+				            ^
+tag.go:97:17: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"%v: invalid flag format, got %q\", omitemptyPrefix, option)" (goerr113)
+				return nil, fmt.Errorf("%v: invalid flag format, got %q", omitemptyPrefix, option)
+				            ^
+tag.go:102:16: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"invalid option %q\", option)" (goerr113)
+			return nil, fmt.Errorf("invalid option %q", option)
+			            ^
+utils.go:18:9: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"bitsize not squaring by 2: bitsize %v\", bitsize)" (goerr113)
+		panic(fmt.Errorf("bitsize not squaring by 2: bitsize %v", bitsize))
+		      ^
+utils.go:21:9: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"bitsize is larger than 2048 bit: bitsize %v\", bitsize)" (goerr113)
+		panic(fmt.Errorf("bitsize is larger than 2048 bit: bitsize %v", bitsize))
+		      ^
+utils.go:29:9: err113: do not define dynamic errors, use wrapped static errors instead: "fmt.Errorf(\"bitsize too small: have %v, want at least %v\", bitsize, vbytes)" (goerr113)
+		panic(fmt.Errorf("bitsize too small: have %v, want at least %v", bitsize, vbytes))
+		      ^
+decoder_basic.go:19:14: fieldalignment: struct with 112 pointer bytes could be 96 (govet)
+type Decoder struct {
+             ^
+registry.go:58:17: fieldalignment: struct with 32 pointer bytes could be 24 (govet)
+type orphanType struct {
+                ^
+registry.go:63:12: fieldalignment: struct with 32 pointer bytes could be 24 (govet)
+type field struct {
+           ^
+registry.go:108:19: fieldalignment: struct with 32 pointer bytes could be 16 (govet)
+type structFields struct {
+                  ^
+tag.go:9:16: fieldalignment: struct with 24 pointer bytes could be 16 (govet)
+type structTag struct {
+               ^
+common_types.go:21:2: return with no blank line before (nlreturn)
+	return &Int128{*i}
+	^
+common_types.go:27:2: return with no blank line before (nlreturn)
+	return &Int128{*i}
+	^
+common_types.go:34:2: return with no blank line before (nlreturn)
+	return nil
+	^
+decoder.go:294:4: continue with no blank line before (nlreturn)
+			continue
+			^
+decoder.go:307:5: continue with no blank line before (nlreturn)
+				continue
+				^
+encoder.go:129:4: continue with no blank line before (nlreturn)
+			continue
+			^
+decoder_basic.go:51:15: error returned from external package is unwrapped: sig: func (*bufio.Reader).Peek(n int) ([]byte, error) (wrapcheck)
+		return nil, err
+		            ^
+decoder_basic.go:197:9: error returned from external package is unwrapped: sig: func io.ReadAll(r io.Reader) ([]byte, error) (wrapcheck)
+	return io.ReadAll(&d.r)
+	       ^
+encoder_basic.go:35:10: error returned from interface method should be wrapped: sig: func (io.Writer).Write(p []byte) (n int, err error) (wrapcheck)
+		return err
+		       ^
+cmd/tlgen/root.go:8:20: Error return value of `c.App.Writer.Write` is not checked (errcheck)
+	c.App.Writer.Write([]byte("Hello goreleaser!\n"))
+	                  ^
+cmd/tlgen/app.go:1: Missed header for check (goheader)
+package main
+cmd/tlgen/app.go:9:5: app is a global variable (gochecknoglobals)
+var app = &cli.App{
+    ^
+schema/parser.go:142: Function 'normalizeEntries' has too many statements (60 > 50) (funlen)
+func normalizeEntries(items []declaration.ProgramEntry, functionsMode bool) ([]Object, map[string]string, error) {
+schema/parser.go:250: File is not `gofumpt`-ed (gofumpt)
+
+schema/parser.go:87:40: add-constant: avoid magic numbers like '16', create a named constant for it (revive)
+	crc, err := strconv.ParseUint(crcStr, 16, 32)
+	                                      ^
+schema/parser.go:164:43: add-constant: avoid magic numbers like '2', create a named constant for it (revive)
+				parts := strings.SplitN(comment, " ", 2)
+				                                      ^
+schema/parser.go:167:22: add-constant: avoid magic numbers like '2', create a named constant for it (revive)
+				if len(parts) >= 2 {
+				                 ^
+schema/parser.go:170:16: add-constant: string literal "" appears, at least, 3 times, create a named constant for it (revive)
+					comment = ""
+					          ^
+schema/parser.go:180:34: add-constant: string literal "@" appears, at least, 3 times, create a named constant for it (revive)
+					return nil, nil, errors.New("@" + tag + " " + comment + ": impossible on functions")
+					                            ^
+schema/parser.go:187:46: add-constant: string literal " " appears, at least, 3 times, create a named constant for it (revive)
+					return nil, nil, errors.New("@" + tag + " " + comment + ": type comment declared twice")
+					                                        ^
+schema/parser.go:153:3: empty-lines: extra empty line at the end of a block (revive)
+		switch {
+		case item.Newline:
+			constructorComment = ""
+			constructorCommentType = ""
+			argumentComments = map[string]string{}
+
+		case item.Comment != nil:
+			comment := strings.TrimSpace(strings.TrimPrefix(*item.Comment, "//"))
+			var commentTag string
+			if strings.HasPrefix(comment, "@") {
+				comment = strings.TrimPrefix(comment, "@")
+				parts := strings.SplitN(comment, " ", 2)
+
+				commentTag = parts[0]
+				if len(parts) >= 2 {
+					comment = strings.TrimSpace(parts[1])
+				} else {
+					comment = ""
+				}
+			}
+
+			switch tag := commentTag; tag {
+			case "":
+				// pass
+
+			case tagType:
+				if functionsMode {
+					return nil, nil, errors.New("@" + tag + " " + comment + ": impossible on functions")
+				}
+
+				// special case, declaration of type apply to first available type (= SomeType;).
+				// when type comment applied to type, currentTypeComment is clearing, so we checking
+				// is this type comment declared twice.
+				if currentTypeComment != "" {
+					return nil, nil, errors.New("@" + tag + " " + comment + ": type comment declared twice")
+				}
+				currentTypeComment = comment
+
+			case tagEnum, tagConstructor, tagMethod:
+				if functionsMode && tag != tagMethod {
+					return nil, nil, errors.New("@" + tag + ": works only in type definitions")
+				} else if !functionsMode && comment == tagMethod {
+					return nil, nil, errors.New("@" + tag + ": works only in functions definitions")
+				}
+
+				if constructorCommentType != "" {
+					return nil, nil, errors.New("@" + tag + " " + comment + ": constructor comment declared twice")
+				}
+				constructorCommentType = tag
+				constructorComment = comment
+
+			case tagParam:
+				parts := strings.SplitN(comment, " ", 2)
+				realComment := ""
+				paramName := parts[0]
+				if len(parts) >= 2 {
+					realComment = strings.TrimSpace(parts[1])
+				} else {
+					realComment = ""
+				}
+
+				if _, ok := argumentComments[paramName]; ok {
+					return nil, nil, errors.New("@param " + paramName + ": comment declared twice")
+				}
+				if realComment != "" {
+					argumentComments[paramName] = realComment
+				}
+
+			default:
+				return nil, nil, errors.New("@" + commentTag + ": invalid comment tag")
+			}
+
+		case item.Decl != nil:
+			obj, err := normalizeCombinator(item.Decl, constructorComment, argumentComments)
+			if err != nil {
+				return nil, nil, err
+			}
+			objects = append(objects, *obj)
+
+			if currentTypeComment != "" {
+				v, ok := obj.Type.(TypeCommon)
+				if !ok {
+					return nil, nil, errors.New("@type: comment set to " + obj.Type.String() + ", which is impossible")
+				}
+
+				if _, ok := typeComments[string(v)]; ok {
+					return nil, nil, errors.New("@type: for " + string(v) + ", type comment defined twice")
+				}
+
+				typeComments[string(v)] = currentTypeComment
+				currentTypeComment = ""
+			}
+
+			constructorComment = ""
+			constructorCommentType = ""
+			argumentComments = map[string]string{}
+		}
+schema/schema.go:109:1: redefines-builtin-id: redefinition of the built-in type Type (revive)
+type Type interface {
+	fmt.Stringer
+
+	_isType()
+}
+schema/parser.go:81:1: cognitive-complexity: function normalizeCombinator has cognitive complexity 10 (> max enabled 7) (revive)
+func normalizeCombinator(decl *declaration.CombinatorDecl, constructorComment string, argsComments map[string]string) (*Object, error) {
+	parts := strings.Split(decl.ID, "#") // guaranteed to split by two parts, lexer handles it
+	name := parts[0]
+	crcStr := parts[1]
+
+	// same: lexer handles everything already
+	crc, err := strconv.ParseUint(crcStr, 16, 32)
+	if err != nil {
+		panic(err)
+	}
+
+	params := make([]Parameter, len(decl.Args))
+	for i, arg := range decl.Args {
+		arg := arg
+
+		var comment string
+		if !arg.Ident.Empty {
+			comment = argsComments[arg.Ident.String()]
+			delete(argsComments, arg.Ident.String())
+		}
+
+		var argErr error
+		params[i], argErr = normalizeArgument(&arg, comment)
+		if argErr != nil {
+			return nil, errors.Wrap(argErr, decl.ID)
+		}
+	}
+
+	typ, err := normalizeIdent(&declaration.Ident{
+		Simple:    declaration.SimpleIdent{Type: &declaration.TypeIdent{Ident: decl.Result.Simple}},
+		Extension: decl.Result.Expr,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, decl.ID+": parsing return type")
+	}
+
+	if len(argsComments) != 0 {
+		keys := make([]string, 0, len(argsComments))
+		for k := range argsComments {
+			keys = append(keys, k)
+		}
+		return nil, errors.New(decl.ID + ": unknown params in comment tags: " + strings.Join(keys, ", "))
+	}
+
+	return &Object{
+		Comment:    constructorComment,
+		Name:       name,
+		CRC:        uint32(crc),
+		Parameters: params,
+		Type:       typ,
+	}, nil
+}
+schema/parser.go:9:1: Expected '\t', Found '\n' at schema/parser.go[line 9,col 1] (gci)
+
+^
+decoder_test.go:135: Function 'TestDecodeUnknown' is too long (156 > 100) (funlen)
+func TestDecodeUnknown(t *testing.T) {
+fixtures_test.go:6:1: max-public-structs: you have exceeded the maximum number of public struct declarations (revive)
+package tl_test
+
+// это набор разнообразных фикстур, которые хранятся исключительно для тестов
+// фикстуры являются полноценно сгенерированными объектами из пакета telegram
+
+import (
+	. "github.com/xelaj/tl"
+)
+
+type MultipleChats struct {
+	Chats []any
+}
+
+func (*MultipleChats) CRC() uint32 {
+	return uint32(0xff1144cc)
+}
+
+type Chat struct {
+	_                 struct{} `tl:"flag,bitflag"`
+	Creator           bool     `tl:",omitempty:flag:0,implicit"`
+	Kicked            bool     `tl:",omitempty:flag:1,implicit"`
+	Left              bool     `tl:",omitempty:flag:2,implicit"`
+	Deactivated       bool     `tl:",omitempty:flag:5,implicit"`
+	ID                int32
+	Title             string
+	Photo             string
+	ParticipantsCount int32
+	Date              int32
+	Version           int32
+	AdminRights       *Rights `tl:",omitempty:flag:14"`
+	BannedRights      *Rights `tl:",omitempty:flag:18"`
+}
+
+func (*Chat) CRC() uint32 {
+	return uint32(0x3bda1bde)
+}
+
+func (*Chat) FlagIndex() int {
+	return 0
+}
+
+type AuthSentCode struct {
+	_             struct{} `tl:"flag,bitflag"`
+	Type          AuthSentCodeType
+	PhoneCodeHash string
+	NextType      AuthCodeType `tl:",omitempty:flag:1"`
+	Timeout       *int32       `tl:",omitempty:flag:2"`
+}
+
+func (*AuthSentCode) CRC() uint32 {
+	return uint32(0x5e002502)
+}
+
+func (*AuthSentCode) FlagIndex() int {
+	return 0
+}
+
+type SomeNullStruct struct{}
+
+func (*SomeNullStruct) CRC() uint32 {
+	return uint32(0xc4f9186b)
+}
+
+type AuthSentCodeType interface {
+	Object
+	ImplementsAuthSentCodeType()
+}
+
+type AuthSentCodeTypeApp struct {
+	Length int32
+}
+
+func (*AuthSentCodeTypeApp) CRC() uint32 {
+	return uint32(0x3dbb5986)
+}
+
+func (*AuthSentCodeTypeApp) ImplementsAuthSentCodeType() {}
+
+type Rights struct {
+	_              struct{} `tl:"flag,bitflag"`
+	DeleteMessages bool     `tl:",omitempty:flag:3,implicit"`
+	BanUsers       bool     `tl:",omitempty:flag:4,implicit"`
+}
+
+func (*Rights) CRC() uint32 {
+	return uint32(0x5fb224d5)
+}
+
+func (*Rights) FlagIndex() int {
+	return 0
+}
+
+type AuthCodeType uint32
+
+const (
+	AuthCodeTypeSms       AuthCodeType = 1923290508
+	AuthCodeTypeCall      AuthCodeType = 1948046307
+	AuthCodeTypeFlashCall AuthCodeType = 577556219
+)
+
+func (e AuthCodeType) String() string {
+	switch e {
+	case AuthCodeTypeSms:
+		return "auth.codeTypeSms"
+	case AuthCodeTypeCall:
+		return "auth.codeTypeCall"
+	case AuthCodeTypeFlashCall:
+		return "auth.codeTypeFlashCall"
+	default:
+		return "<UNKNOWN auth.CodeType>"
+	}
+}
+func (e AuthCodeType) CRC() uint32 {
+	return uint32(e)
+}
+
+type PollResults struct { //nolint:maligned required ordering
+	_                struct{}            `tl:"flag,bitflag"`
+	Min              bool                `tl:",omitempty:flag:0,implicit"`
+	Results          []*PollAnswerVoters `tl:",omitempty:flag:1"`
+	TotalVoters      *int32              `tl:",omitempty:flag:2"`
+	RecentVoters     []int32             `tl:",omitempty:flag:3"`
+	Solution         *string             `tl:",omitempty:flag:4"`
+	SolutionEntities []MessageEntity     `tl:",omitempty:flag:4"`
+}
+
+func (*PollResults) CRC() uint32 {
+	return uint32(0xbadcc1a3)
+}
+func (*PollResults) FlagIndex() int {
+	return 0
+}
+
+type PollAnswerVoters struct { //nolint:maligned required ordering
+	_       struct{} `tl:"flag,bitflag"`
+	Chosen  bool     `tl:",omitempty:flag:0,implicit"`
+	Correct bool     `tl:",omitempty:flag:1,implicit"`
+	Option  []byte
+	Voters  int32
+}
+
+func (*PollAnswerVoters) CRC() uint32 {
+	return uint32(0x3b6ddad2)
+}
+func (*PollAnswerVoters) FlagIndex() int {
+	return 0
+}
+
+type MessageEntity interface {
+	Object
+	ImplementsMessageEntity()
+}
+
+// type MessageEntityUnknown struct {
+// 	Offset int32
+// 	Length int32
+// }
+//
+// func (*MessageEntityUnknown) CRC() uint32 {
+// 	return uint32(0xbb92ba95)
+// }
+//
+// func (*MessageEntityUnknown) ImplementsMessageEntity() {}
+
+type AccountInstallThemeParams struct {
+	_      struct{}   `tl:"flag,bitflag"`
+	Dark   bool       `tl:",omitempty:flag:0,implicit"`
+	Format *string    `tl:",omitempty:flag:1"`
+	Theme  InputTheme `tl:",omitempty:flag:1"`
+}
+
+func (e *AccountInstallThemeParams) CRC() uint32 {
+	return uint32(0x7ae43737)
+}
+
+func (*AccountInstallThemeParams) FlagIndex() int {
+	return 0
+}
+
+type InputTheme interface {
+	Object
+	ImplementsInputTheme()
+}
+
+type InputThemeObj struct {
+	ID         int64
+	AccessHash int64
+}
+
+func (*InputThemeObj) CRC() uint32 {
+	return uint32(0x3c5693e9)
+}
+
+func (*InputThemeObj) ImplementsInputTheme() {}
+
+type AccountUnregisterDeviceParams struct {
+	TokenType int32
+	Token     string
+	OtherUids []int32
+}
+
+func (e *AccountUnregisterDeviceParams) CRC() uint32 {
+	return uint32(0x3076c4bf)
+}
+
+type AnyStructWithAnyType struct {
+	SomeInt int32
+	Data    any
+}
+
+func (*AnyStructWithAnyType) CRC() uint32 {
+	return uint32(0xfdfd4646)
+}
+
+type AnyStructWithAnyObject struct {
+	SomeInt int32
+	Data    Object
+}
+
+func (*AnyStructWithAnyObject) CRC() uint32 {
+	return uint32(0xfd46fd46)
+}
+
+type InvokeWithLayerParams struct {
+	Layer int32
+	Query any
+}
+
+func (*InvokeWithLayerParams) CRC() uint32 {
+	return 0xda9b0d0d
+}
+
+type InitConnectionParams struct {
+	_              struct{} `tl:"flag,bitflag"`
+	APIID          int32
+	DeviceModel    string
+	SystemVersion  string
+	AppVersion     string
+	SystemLangCode string
+	LangPack       string
+	LangCode       string
+	Proxy          any `tl:",omitempty:flag:0"`
+	Params         any `tl:",omitempty:flag:1"`
+
+	Query any
+}
+
+func (*InitConnectionParams) CRC() uint32 {
+	return 0xc1cd5ea9
+}
+
+func (*InitConnectionParams) FlagIndex() int {
+	return 0
+}
+
+type ResPQ struct {
+	Nonce        *Int128
+	ServerNonce  *Int128
+	Pq           []byte
+	Fingerprints []int64
+}
+
+func (*ResPQ) CRC() uint32 {
+	return 0x05162463
+}
+
+// issue #59 fixtures
+
+type Poll struct {
+	ID             int64
+	_              struct{} `tl:"flag,bitflag"`
+	Closed         bool     `tl:",omitempty:flag:0,implicit"`
+	PublicVoters   bool     `tl:",omitempty:flag:1,implicit"`
+	MultipleChoice bool     `tl:",omitempty:flag:2,implicit"`
+	Quiz           bool     `tl:",omitempty:flag:3,implicit"`
+	Question       string
+	Answers        []*PollAnswer
+	ClosePeriod    *int32 `tl:",omitempty:flag:4"`
+	CloseDate      *int32 `tl:",omitempty:flag:5"`
+}
+
+func (*Poll) CRC() uint32 {
+	return 0x86e18161
+}
+
+func (*Poll) FlagIndex() int {
+	return 1
+}
+
+type PollAnswer struct {
+	Text   string
+	Option []byte
+}
+
+func (*PollAnswer) CRC() uint32 {
+	return 0x6ca9c2e9
+}
+
+func ptr[T any](value T) *T { return &value }
+main_test.go:57:1: function-length: maximum number of statements per function exceeded; max 10 but got 20 (revive)
+func Hexed(in string) []byte {
+	reader := bytes.NewReader([]byte(in))
+	buf := []rune{}
+	for {
+		r, ok := readAndCheck(reader)
+		if !ok {
+			break
+		}
+		switch r {
+		case ' ', '\n', '\t':
+			continue
+		}
+
+		if r == '/' {
+			r, ok := readAndCheck(reader)
+			if !ok {
+				panic("expected comment")
+			}
+			if r != '/' {
+				panic("expected comment")
+			}
+			skipComment(reader)
+			continue
+		}
+
+		buf = append(buf, r)
+	}
+
+	res, err := hex.DecodeString(string(buf))
+
+	check(err)
+	return res
+}
+encoder_bench_test.go:21:17: add-constant: avoid magic numbers like '123', create a named constant for it (revive)
+				ID:         123,
+				            ^
+encoder_bench_test.go:22:17: add-constant: avoid magic numbers like '321', create a named constant for it (revive)
+				AccessHash: 321,
+				            ^
+encoder_test.go:38:18: add-constant: avoid magic numbers like '123', create a named constant for it (revive)
+					ID:         123,
+					            ^
+encoder_test.go:39:18: add-constant: avoid magic numbers like '321', create a named constant for it (revive)
+					AccessHash: 321,
+					            ^
+encoder_test.go:51:6: add-constant: avoid magic numbers like '1337', create a named constant for it (revive)
+					1337, 228, 322,
+					^
+encoder_test.go:60:29: add-constant: avoid magic numbers like '123', create a named constant for it (revive)
+				Nonce:        NewInt128(123),
+				                        ^
+encoder_test.go:61:29: add-constant: avoid magic numbers like '321', create a named constant for it (revive)
+				ServerNonce:  NewInt128(321),
+				                        ^
+encoder_test.go:63:27: add-constant: avoid magic numbers like '322', create a named constant for it (revive)
+				Fingerprints: []int64{322, 1337},
+				                      ^
+decoder_test.go:13:1: Expected '\t', Found '\n' at decoder_test.go[line 13,col 1] (gci)
+
+^
+encoder_test.go:12:1: Expected '\t', Found '\n' at encoder_test.go[line 12,col 1] (gci)
+
+^
+equality_test.go:13:1: Expected '\t', Found '\n' at equality_test.go[line 13,col 1] (gci)
+
+^
+decoder_test.go:18:2: True is a global variable (gochecknoglobals)
+	True = true // for pointer
+	^
+decoder_test.go:24:23: fieldalignment: struct with 64 pointer bytes could be 48 (govet)
+	for _, tt := range []struct {
+	                     ^
+decoder_test.go:102:13: fieldalignment: struct with 56 pointer bytes could be 32 (govet)
+	tests := []struct {
+	           ^
+decoder_test.go:138:23: fieldalignment: struct with 88 pointer bytes could be 72 (govet)
+	for _, tt := range []struct {
+	                     ^
+encoder_test.go:17:13: fieldalignment: struct with 64 pointer bytes could be 48 (govet)
+	tests := []struct {
+	           ^
+equality_test.go:21:23: fieldalignment: struct with 32 pointer bytes could be 24 (govet)
+	for _, tt := range []struct {
+	                     ^
+fixtures_test.go:23:11: fieldalignment: struct with 72 pointer bytes could be 40 (govet)
+type Chat struct {
+          ^
+fixtures_test.go:47:19: fieldalignment: struct with 48 pointer bytes could be 32 (govet)
+type AuthSentCode struct {
+                  ^
+fixtures_test.go:122:18: fieldalignment: struct with 80 pointer bytes could be 72 (govet)
+type PollResults struct { //nolint:maligned required ordering
+                 ^
+fixtures_test.go:139:23: fieldalignment: struct of size 40 could be 32 (govet)
+type PollAnswerVoters struct { //nolint:maligned required ordering
+                      ^
+fixtures_test.go:211:27: fieldalignment: struct with 24 pointer bytes could be 16 (govet)
+type AnyStructWithAnyType struct {
+                          ^
+fixtures_test.go:220:29: fieldalignment: struct with 24 pointer bytes could be 16 (govet)
+type AnyStructWithAnyObject struct {
+                            ^
+fixtures_test.go:238:27: fieldalignment: struct with 152 pointer bytes could be 136 (govet)
+type InitConnectionParams struct {
+                          ^
+fixtures_test.go:274:11: fieldalignment: struct with 72 pointer bytes could be 40 (govet)
+type Poll struct {
+          ^
+main_test.go:71:4: shadow: declaration of "r" shadows declaration at line 61 (govet)
+			r, ok := readAndCheck(reader)
+			^
+decoder_test.go:119:2: Range statement for test TestDecodeBool missing the call to method parallel in test Run (paralleltest)
+	for _, tt := range tests {
+	^
+encoder_test.go:16:1: Function TestEncode missing the call to method parallel (paralleltest)
+func TestEncode(t *testing.T) {
+^
+encoder_test.go:106:2: Range statement for test TestEncode missing the call to method parallel in test Run (paralleltest)
+	for _, tt := range tests {
+	^
+schema/internal/declaration/declaration_test.go:13: Function 'TestParseIt' is too long (130 > 100) (funlen)
+func TestParseIt(t *testing.T) {
+schema/internal/declaration/declaration_test.go:9:1: Expected '\t', Found '\n' at schema/internal/declaration/declaration_test.go[line 9,col 1] (gci)
+
+^
+schema/internal/declaration/declaration.go:18:21: fieldalignment: struct with 56 pointer bytes could be 40 (govet)
+type CombinatorDecl struct {
+                    ^
+schema/internal/declaration/declaration.go:29:15: fieldalignment: struct with 48 pointer bytes could be 40 (govet)
+type Argument struct {
+              ^
+schema/internal/declaration/declaration_test.go:14:23: fieldalignment: struct with 56 pointer bytes could be 48 (govet)
+	for _, tt := range []struct {
+	                     ^
+schema/internal/lexer/word_lexer.go:136:1: cyclomatic complexity 24 of func `LexExact` is high (> 15) (gocyclo)
+func LexExact(l *L) (StateFunc, error) {
+^
+schema/internal/lexer/lexer.go:210: schema/internal/lexer/lexer.go:210: Line contains TODO/BUG/FIXME: "todo: cache current line and column" (godox)
+// todo: cache current line and column
+schema/internal/lexer/lexer.go:174:70: `contine` is a misspelling of `continue` (misspell)
+// Take receives a string containing all acceptable strings and will contine
+                                                                     ^
+schema/internal/lexer/lexer.go:11:6: the type name `ErrLexer` should conform to the `XxxError` format (errname)
+type ErrLexer struct {
+     ^
+schema/internal/lexer/word_lexer.go:39:6: the type name `ErrWrongToken` should conform to the `XxxError` format (errname)
+type ErrWrongToken struct{}
+     ^
+schema/internal/lexer/word_lexer.go:13:2: lcLetter is a global variable (gochecknoglobals)
+	lcLetter   = singleRange16('a', 'z', true)
+	^
+schema/internal/lexer/word_lexer.go:14:2: ucLetter is a global variable (gochecknoglobals)
+	ucLetter   = singleRange16('A', 'Z', true)
+	^
+schema/internal/lexer/word_lexer.go:15:2: digit is a global variable (gochecknoglobals)
+	digit      = singleRange16('0', '9', true) // unicode.Digit covers too many digits
+	^
+schema/internal/lexer/word_lexer.go:16:2: hexDigit is a global variable (gochecknoglobals)
+	hexDigit   = unicode.ASCII_Hex_Digit       // extended hex digits with upper symbols
+	^
+schema/internal/lexer/word_lexer.go:17:2: underscore is a global variable (gochecknoglobals)
+	underscore = rangetable.New('_')
+	^
+schema/internal/lexer/word_lexer.go:18:2: letter is a global variable (gochecknoglobals)
+	letter     = rangetable.Merge(lcLetter, ucLetter)
+	^
+schema/internal/lexer/word_lexer.go:19:2: identChar is a global variable (gochecknoglobals)
+	identChar  = rangetable.Merge(letter, digit, underscore)
+	^
+schema/internal/lexer/word_lexer.go:20:2: divider is a global variable (gochecknoglobals)
+	divider    = rangetable.New(' ', '\t')
+	^
+schema/internal/lexer/word_lexer.go:23:5: lexers is a global variable (gochecknoglobals)
+var lexers = []StateFunc{
+    ^
+schema/internal/lexer/definition.go:65:15: fieldalignment: struct with 48 pointer bytes could be 40 (govet)
+type defLexer struct {
+              ^
+schema/internal/lexer/lexer.go:61:12: fieldalignment: struct with 16 pointer bytes could be 8 (govet)
+type Token struct {
+           ^
+schema/internal/lexer/lexer.go:76:8: fieldalignment: struct with 56 pointer bytes could be 24 (govet)
+type L struct {
+       ^
+schema/internal/lexer/word_lexer_test.go:11:13: fieldalignment: struct with 56 pointer bytes could be 40 (govet)
+	tests := []struct {
+	           ^
+schema/internal/lexer/word_lexer.go:223:2: variable 'ok' is only used in the if-statement (schema/internal/lexer/word_lexer.go:224:2); consider using short syntax (ifshort)
+	ok := takeLcIdent(l)
+	^
+schema/internal/lexer/word_lexer.go:233:2: variable 'ok' is only used in the if-statement (schema/internal/lexer/word_lexer.go:234:2); consider using short syntax (ifshort)
+	ok := takeUcIdent(l)
+	^
+schema/internal/lexer/word_lexer.go:336:2: variable 'r' is only used in the if-statement (schema/internal/lexer/word_lexer.go:337:2); consider using short syntax (ifshort)
+	r := l.Next()
+	^
+schema/internal/lexer/word_lexer.go:52:5: return both the `nil` error and invalid value: use a sentinel error instead (nilnil)
+				return nil, nil
+				^
+schema/internal/lexer/word_lexer.go:84:2: return both the `nil` error and invalid value: use a sentinel error instead (nilnil)
+	return nil, nil
+	^
+schema/internal/lexer/word_lexer.go:95:2: return both the `nil` error and invalid value: use a sentinel error instead (nilnil)
+	return nil, nil
+	^
+schema/internal/lexer/word_lexer_test.go:47:2: Range statement for test TestAllLexers missing the call to method parallel in test Run (paralleltest)
+	for _, tcase := range tests {
+	^
+schema/internal/lexer/definition.go:59:15: error returned from external package is unwrapped: sig: func io.ReadAll(r io.Reader) ([]byte, error) (wrapcheck)
+		return nil, err
+		            ^

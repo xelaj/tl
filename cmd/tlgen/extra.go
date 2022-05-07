@@ -1,0 +1,10 @@
+// Copyright (c) 2022 Xelaj Software
+//
+// This file is a part of tl package.
+// See https://github.com/xelaj/tl/blob/master/LICENSE.md for details.
+
+package main
+
+const (
+	packageName = "tlgen"
+)

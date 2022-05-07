@@ -1,0 +1,23 @@
+version: 3
+
+includes:
+  deps: ./.task/Taskfile_deps.yaml
+
+vars:
+  GIT_REV:
+    sh: git log -1 --format="%h"
+
+tasks:
+  lint:
+    deps: [deps:golangci-lint]
+    vars:
+      args: '{{ .CLI_ARGS | default "./..."}}'
+    cmds:
+      - cmd: golangci-lint run --verbose  {{.args}}
+        desc: Running linters
+
+  test:
+    deps: [deps:gotest]
+    cmds:
+      - cmd: gotest -v -timeout 1m -race ./...
+        desc: running tests

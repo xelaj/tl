@@ -22,7 +22,7 @@ func IsTypeLangDefinition(raw []byte, limit uint32) (matched bool) {
 
 	str := string(raw)
 
-	// someEnum#5508ec75 = CoolEnumerate;
+	// expecting `someEnum#5508ec75 = CoolEnumerate;`
 	var line string
 	for len(str) > 0 {
 		line, str = readLineWithoutComment(str)

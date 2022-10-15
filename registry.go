@@ -10,8 +10,18 @@ import (
 	"reflect"
 )
 
+// key is crc code, value is name of constructor
 type enumNames = map[crc32]string
 
+type Registry interface {
+}
+
+// ObjectRegistry is a type, which handles code generated schema, and could be
+// useful for spawning TL objects. Unlike RawSchemaRegistry, it can work only
+// with predefined go types.
+//
+// If you are not able to use codegen, use RawSchemaRegistry, it could be
+// slower, but more flexible.
 type ObjectRegistry struct {
 	// in objects it's allowed to store ONLY structs
 	objects      map[crc32]reflect.Type

@@ -47,6 +47,14 @@ Full native implementation of TL serializing language. Simple and fast.
 
 **english** [русский][inex_ru]
 
+## 🤔 What is it?
+
+TL is a serialization format, created by Telegram and TON devs. This format
+slightly looks like Protobuf, but has a lot of exotic differences, which creates
+some issues with working about this format. This package solve a lot of stuff
+and handle 90% of your routine, related to serialization (and trust me, this
+routine could be a pain, that's why we created xelaj/tl).
+
 ## ✨ Features
 
 * Probably the best golang package for parsing TL schemas
@@ -56,10 +64,40 @@ Full native implementation of TL serializing language. Simple and fast.
 
 ## 👨‍💻 How to use
 
-TL is a serialization format, created by Telegram and TON devs. This format
-slightly looks like Protobuf, but has a lot of exotic differences, which creates
-some issues with working about this format. Here are some usage cases, how you
-can do some stuff:
+Here are some usage cases, how you can do some stuff:
+
+### Basic usage
+
+``` go
+package main
+
+import "github.com/xelaj/tl"
+
+type MyConstructor struct {
+    _                 struct{} `tl:"flag,bitflag"`
+    Name              string
+    Creator           bool     `tl:",omitempty:flag:0,implicit"`
+}
+
+func (c *MyConstructor) CRC() uint32 { return 0x12345678 }
+
+...
+
+func main() {
+    RegisterObjects(
+        (*MyConstructor)(nil),
+    )
+
+    data := []byte{...}
+    response := &MyConstructor{}
+
+    tl.Unmarshal(data, response)
+
+    // And boom! You will have decoded object!
+}
+```
+
+[![Run in playground](https://t.ly/SGyz)](https://go.dev/play/)
 
 ### Run codegen
 

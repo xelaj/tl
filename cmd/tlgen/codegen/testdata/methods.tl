@@ -1,0 +1,3 @@
+---functions---
+
+account.deleteAccount#418d4e0b reason:string = Bool;

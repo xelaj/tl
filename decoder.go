@@ -38,7 +38,7 @@ type Decoder struct {
 	r           bufio.Reader
 	peekedBytes int
 
-	registry  *Registry
+	registry  *ObjectRegistry
 	endianess binary.ByteOrder
 }
 
@@ -70,7 +70,7 @@ func NewDecoderWithSize(r io.Reader, bufSize int) *Decoder {
 	}
 }
 
-func (d *Decoder) SetRegistry(registry *Registry) *Decoder {
+func (d *Decoder) SetRegistry(registry *ObjectRegistry) *Decoder {
 	d.registry = registry
 
 	return d

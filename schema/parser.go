@@ -88,6 +88,7 @@ func normalizeCombinator(
 	decl *declaration.CombinatorDecl,
 	constructorComment string,
 	argsComments map[string]string,
+	functionsMode bool,
 ) (*Object, error) {
 	parts := strings.Split(decl.ID, "#") // guaranteed to split by two parts, lexer handles it
 	name := parts[0]
@@ -134,11 +135,12 @@ func normalizeCombinator(
 	}
 
 	return &Object{
-		Comment:    constructorComment,
-		Name:       name,
-		CRC:        uint32(crc),
-		Parameters: params,
-		Type:       typ,
+		Comment:  constructorComment,
+		Name:     name,
+		CRC:      uint32(crc),
+		Fields:   params,
+		Type:     typ,
+		isMethod: functionsMode,
 	}, nil
 }
 
@@ -150,9 +152,9 @@ const (
 	tagParam       = "param"
 )
 
-func normalizeEntries(items []declaration.ProgramEntry, functionsMode bool) ([]Object, map[string]string, error) {
+func normalizeEntries(items []declaration.ProgramEntry, functionsMode bool) ([]*Object, map[string]string, error) {
 	var (
-		objects      = []Object{}
+		objects      = []*Object{}
 		typeComments = map[string]string{}
 
 		currentTypeComment     string
@@ -239,11 +241,11 @@ func normalizeEntries(items []declaration.ProgramEntry, functionsMode bool) ([]O
 			}
 
 		case item.Decl != nil:
-			obj, err := normalizeCombinator(item.Decl, constructorComment, argumentComments)
+			obj, err := normalizeCombinator(item.Decl, constructorComment, argumentComments, functionsMode)
 			if err != nil {
 				return nil, nil, err
 			}
-			objects = append(objects, *obj)
+			objects = append(objects, obj)
 
 			if currentTypeComment != "" {
 				v, ok := obj.Type.(TypeCommon)
@@ -283,8 +285,8 @@ func normalizeProgram(program *declaration.Program) (*Schema, error) {
 	}
 
 	return &Schema{
-		Objects:      types,
-		Methods:      methods,
+		Objects: append(types, methods...),
+		//	Methods:      methods,
 		TypeComments: comments,
 	}, nil
 }

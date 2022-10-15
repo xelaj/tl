@@ -12,7 +12,7 @@ import (
 
 type enumNames = map[crc32]string
 
-type Registry struct {
+type ObjectRegistry struct {
 	// in objects it's allowed to store ONLY structs
 	objects      map[crc32]reflect.Type
 	structFields map[crc32]structFields
@@ -25,7 +25,7 @@ type Registry struct {
 	orphans map[crc32]orphanType
 }
 
-func (r *Registry) pushObject(crc crc32, typ reflect.Type) {
+func (r *ObjectRegistry) pushObject(crc crc32, typ reflect.Type) {
 	if typ.Kind() != reflect.Struct {
 		panic("accepted only structs")
 	}
@@ -37,7 +37,7 @@ func (r *Registry) pushObject(crc crc32, typ reflect.Type) {
 }
 
 // spawnObject spawns new object by crc code from registry.
-func (r *Registry) spawnObject(crc crc32) (reflect.Value, error) {
+func (r *ObjectRegistry) spawnObject(crc crc32) (reflect.Value, error) {
 	_type, ok := r.objects[crc]
 	if !ok {
 		return reflect.Value{}, fmt.Errorf("object with crc 0x%08x not found", crc)
@@ -114,7 +114,7 @@ type fieldInterface string
 func (fieldInterface) _isFieldType() {}
 
 //nolint:gochecknoglobals // obvious reason to fo that.
-var defaultRegistry = &Registry{}
+var defaultRegistry = &ObjectRegistry{}
 
 func RegisterObjects(objects ...Object) { defaultRegistry.RegisterObjects(objects...) }
 func RegisterEnums(enums ...Enum)       { defaultRegistry.RegisterEnums(enums...) }
@@ -137,13 +137,13 @@ type bitflagBit struct {
 	bitIndex   int // собственно в какой бит пихать флаг что все ок
 }
 
-func (r *Registry) RegisterObjects(objects ...Object) {
+func (r *ObjectRegistry) RegisterObjects(objects ...Object) {
 	for _, object := range objects {
 		r.registerObject(object)
 	}
 }
 
-func (r *Registry) registerObject(o Object) {
+func (r *ObjectRegistry) registerObject(o Object) {
 	if o == nil {
 		panic("object is nil")
 	}
@@ -206,13 +206,13 @@ func (r *Registry) registerObject(o Object) {
 	r.pushObject(o.CRC(), typ)
 }
 
-func (r *Registry) RegisterEnums(enums ...Enum) {
+func (r *ObjectRegistry) RegisterEnums(enums ...Enum) {
 	for _, enum := range enums {
 		r.registerEnum(enum)
 	}
 }
 
-func (r *Registry) registerEnum(enum Enum) {
+func (r *ObjectRegistry) registerEnum(enum Enum) {
 	if enum == nil {
 		panic("enum is nil")
 	}

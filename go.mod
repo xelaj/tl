@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/alecthomas/participle/v2 v2.0.0-alpha8
+	github.com/dave/jennifer v1.6.0
 	github.com/gabriel-vasile/mimetype v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0

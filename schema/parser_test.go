@@ -27,27 +27,26 @@ func TestParseFile(t *testing.T) {
 	}{{
 		file: "internal/testdata/simplest.tl",
 		expected: &Schema{
-			Objects: []Object{{
-				Name:       "someEnum",
-				CRC:        0x5508ec75,
-				Parameters: []Parameter{},
-				Type:       TypeCommon("CoolEnumerate"),
-			}},
-			Methods: []Object{{
-				Name:       "someFunc",
-				CRC:        0x7da07ec9,
-				Parameters: []Parameter{},
-				Type:       TypeCommon("CoolEnumerate"),
-			}},
+			Objects: []*Object{{
+				Name:   "someEnum",
+				CRC:    0x5508ec75,
+				Fields: []Parameter{},
+				Type:   TypeCommon("CoolEnumerate"),
+			}, Method(&Object{
+				Name:     "someFunc",
+				CRC:      0x7da07ec9,
+				Fields:   []Parameter{},
+				Type:     TypeCommon("CoolEnumerate"),
+			})},
 			TypeComments: map[string]string{},
 		},
 	}, {
 		file: "internal/testdata/many_flags.tl",
 		expected: &Schema{
-			Objects: []Object{{
+			Objects: []*Object{{
 				Name: "a",
 				CRC:  0xf2355507,
-				Parameters: []Parameter{RequiredParameter{
+				Fields: []Parameter{RequiredParameter{
 					Name: "flags",
 					Type: TypeCommon("#"),
 				}, TriggerParameter{
@@ -68,7 +67,6 @@ func TestParseFile(t *testing.T) {
 				}},
 				Type: TypeCommon("ChatFull"),
 			}},
-			Methods:      []Object{},
 			TypeComments: map[string]string{},
 		},
 	}} {

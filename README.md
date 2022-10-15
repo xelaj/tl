@@ -17,7 +17,7 @@
 <img src="https://img.shields.io/static/v1?label=go+report&message=A%2b&color=success&labelColor=27303B&style=for-the-badge">
 </a>
 <a href="https://codecov.io/gh/xelaj/tl">
-<img src="https://img.shields.io/codecov/c/gh/xelaj/mtproto?labelColor=27303B&label=cover&logo=codecov&style=for-the-badge">
+<img src="https://img.shields.io/codecov/c/gh/xelaj/tl?labelColor=27303B&label=cover&logo=codecov&style=for-the-badge">
 </a>
 <a href="https://bit.ly/2xlsVsQ">
 <img src="https://img.shields.io/badge/chat-telegram-0088cc?labelColor=27303B&logo=telegram&style=for-the-badge">
@@ -119,14 +119,14 @@ steps to notify us about problem.
 
 ## 🏋️ TODO
 
-- [x] Full implementation of Tl serializing
-- [x] Tool to generate golang code
-- [ ] Write amazing docs
-- [ ] Create full toolset to support TL
-- [ ] make support of TL-B (incompatible version, used by TON)
-- [ ] Write RFC specification?
-- [ ] write good security policy
-- [ ] setup taskfile for markdown linter
+* [x] Full implementation of Tl serializing
+* [x] Tool to generate golang code
+* [ ] Write amazing docs
+* [ ] Create full toolset to support TL
+* [ ] make support of TL-B (incompatible version, used by TON)
+* [ ] Write RFC specification?
+* [ ] write good security policy
+* [ ] setup taskfile for markdown linter
 
 ## 📒 Running project scripts
 
@@ -137,7 +137,7 @@ For better experience, you can download go-task and run tasks e.g. via
 
 ## 👨‍👩‍👧‍👦 Authors
 
-- **Richard Cooper** <[rcooper.xelaj@protonmail.com](mailto:rcooper.xelaj@protonmail.com)>
+* **Richard Cooper** <[rcooper.xelaj@protonmail.com](mailto:rcooper.xelaj@protonmail.com)>
 
 ## 📝 License
 

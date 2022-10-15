@@ -286,6 +286,4 @@ func bigIntBytes(v *big.Int, bitsize int) []byte {
 
 //revive:enable
 
-func ptr[T any](value T) *T { return &value }
 
-type null = struct{}

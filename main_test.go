@@ -13,6 +13,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	. "github.com/xelaj/tl"
 )
 
@@ -122,3 +124,15 @@ func check(err error) {
 		panic(fmt.Sprintf("%+v", err))
 	}
 }
+
+func noErrAsDefault(e assert.ErrorAssertionFunc) assert.ErrorAssertionFunc {
+	if e == nil {
+		return assert.NoError
+	}
+
+	return e
+}
+
+func ptr[T any](value T) *T { return &value }
+
+type null = struct{}

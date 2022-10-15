@@ -37,7 +37,7 @@ type MarshalState interface {
 // Encoder is a type, which allows you to decode serialized message.
 type Encoder struct {
 	w        io.Writer
-	registry *Registry
+	registry *ObjectRegistry
 
 	endianess binary.ByteOrder
 }
@@ -46,7 +46,7 @@ func NewEncoder(w io.Writer) *Encoder {
 	return &Encoder{w: w, registry: defaultRegistry, endianess: binary.LittleEndian}
 }
 
-func (e *Encoder) SetRegistry(registry *Registry) *Encoder {
+func (e *Encoder) SetRegistry(registry *ObjectRegistry) *Encoder {
 	e.registry = registry
 
 	return e

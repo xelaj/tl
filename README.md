@@ -73,31 +73,30 @@ package main
 
 import "github.com/xelaj/tl"
 
-type MyConstructor struct {
-    _                 struct{} `tl:"flag,bitflag"`
-    Name              string
-    Creator           bool     `tl:",omitempty:flag:0,implicit"`
+type RepoUser struct {
+    _       struct{} `tl:"someBitflag,bitflag"`
+    Nick    string
+    Creator bool `tl:",omitempty:someBitflag:0,implicit"`
+    Editor  bool `tl:",omitempty:someBitflag:7,implicit"`
 }
 
-func (c *MyConstructor) CRC() uint32 { return 0x12345678 }
-
-...
+func (c *RepoUser) CRC() uint32 { return 0x12345678 }
 
 func main() {
-    RegisterObjects(
-        (*MyConstructor)(nil),
-    )
+    tl.RegisterObjects((*RepoUser)(nil))
 
-    data := []byte{...}
-    response := &MyConstructor{}
+    response := &RepoUser{
+        Nick:    "Hello user!",
+        Creator: true,
+        Editor:  true,
+    }
 
-    tl.Unmarshal(data, response)
-
-    // And boom! You will have decoded object!
+    println(tl.Marshal(response))
+    // And boom! 💥 You have decoded object!
 }
 ```
 
-[![Run in playground](https://t.ly/SGyz)](https://go.dev/play/)
+[![Run in playground](https://t.ly/SGyz)](https://go.dev/play/p/Cw25cFM-WDx)
 
 ### Run codegen
 

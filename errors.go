@@ -10,6 +10,15 @@ import (
 	"reflect"
 )
 
+const (
+	ErrUnexpectedNil = errorConst("unexpected nil value")
+	ErrImplicitInt   = errorConst("value must be converted to int32, int64 or uint32 explicitly")
+
+	ErrBitflagTooHigh   = errorConst("trigger bit is more than 32")
+	ErrInvalidTagOption = errorConst("invalid option")
+	ErrInvalidTagFormat = errorConst("invalid tag format")
+)
+
 type ErrRegisteredObjectNotFound struct {
 	Data []byte
 	Crc  uint32
@@ -52,18 +61,38 @@ func (e ErrUnsupportedType) Error() string {
 	return fmt.Sprintf("invalid or unknown type %v", e.Type)
 }
 
-type errorConst string
+type ErrObjectNotRegistered crc32
 
-func (e errorConst) Error() string { return string(e) }
+func (e ErrObjectNotRegistered) Error() string {
+	return fmt.Sprintf("object with crc 0x%08x not registered", crc32(e))
+}
 
-const (
-	ErrUnexpectedNil = errorConst("unexpected nil value")
-	ErrImplicitInt   = errorConst("value must be converted to int32, int64 or uint32 explicitly")
+type ErrInvalidCRC struct {
+	Got  crc32
+	Want crc32
+}
 
-	ErrBitflagTooHigh   = errorConst("trigger bit is more than 32")
-	ErrInvalidTagOption = errorConst("invalid option")
-	ErrInvalidTagFormat = errorConst("invalid tag format")
-)
+func (e ErrInvalidCRC) Error() string {
+	return fmt.Sprintf("invalid crc code: got 0x%08x; want 0x%08x", e.Got, e.Want)
+}
+
+type ErrInvalidBoolCRC crc32
+
+func (e ErrInvalidBoolCRC) Error() string {
+	return fmt.Sprintf(
+		"want a 0x%08x (true) or 0x%08x (false); got 0x%08x",
+		crcTrue,
+		crcFalse,
+		crc32(e),
+	)
+}
+
+type errReadCRC struct {
+	Wrapped error
+}
+
+func (e errReadCRC) Error() string { return "read crc: " + e.Wrapped.Error() }
+func (e errReadCRC) Unwrap() error { return e.Wrapped }
 
 type ErrPath struct {
 	Err  error

@@ -285,5 +285,3 @@ func bigIntBytes(v *big.Int, bitsize int) []byte {
 }
 
 //revive:enable
-
-

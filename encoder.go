@@ -326,7 +326,7 @@ func (e *Encoder) putMessage(msg []byte) error {
 	return e.writeErr(appendMany(
 		lenBytes,
 		msg,
-		make([]byte, pad(len(lenBytes), WordLen, len(msg))),
+		make([]byte, pad(len(lenBytes)+len(msg), WordLen)),
 	))
 }
 
@@ -360,7 +360,7 @@ func getCRCFromMap(m reflect.Value) (uint32, error) {
 }
 
 func maybeNil(v reflect.Value) bool {
-	switch v.Kind() {
+	switch v.Kind() { //nolint:exhaustive // has default statement
 	case reflect.Chan,
 		reflect.Func,
 		reflect.Map,

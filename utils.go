@@ -17,6 +17,9 @@ import (
 
 type null = struct{}
 
+func unreachable()   { panic("Unreachable") }   //nolint:deadcode // why not?
+func unimplemented() { panic("Unimplemented") } //nolint:deadcode // why not?
+
 func littleUint24Bytes(v int) []byte {
 	return []byte{
 		byte(v),
@@ -25,13 +28,10 @@ func littleUint24Bytes(v int) []byte {
 	}
 }
 
-// TODO: пофиксить этот ужас, можно сделать проще, без знания размера длины
+func pad(l, padSize int) int {
+	mod := l % padSize
 
-// https://go.dev/play/p/uU0LiPVCPnI
-func pad(lengthOfSizeLength, wordLen, msgLen int) int {
-	wMinMod := wordLen - ((lengthOfSizeLength + msgLen) % wordLen)
-
-	return (1 - wMinMod/wordLen) * wMinMod
+	return (padSize - mod) * (1 + (mod-padSize)/padSize)
 }
 
 // v is bool, pointer, interface or slice.
@@ -74,6 +74,7 @@ func appendMany[T any](b ...[]T) []T {
 
 func as118[T error](err error) (T, bool) {
 	var converted T
+
 	return converted, errors.As(err, &converted)
 }
 
@@ -81,17 +82,17 @@ type convertibleNum interface {
 	constraints.Integer | constraints.Float
 }
 
-func convertNumErr[V, T convertibleNum](res T, err error) (V, error) {
-	return V(res), err
-}
+func convertNumErr[V, T convertibleNum](res T, err error) (V, error) { return V(res), err }
 
 type convertibleStr interface {
 	~string | ~[]byte
 }
 
-func convertStrErr[V, T convertibleStr](res T, err error) (V, error) {
-	return V(res), err
-}
+func convertStrErr[V, T convertibleStr](res T, err error) (V, error) { return V(res), err }
+
+type errorConst string
+
+func (e errorConst) Error() string { return string(e) }
 
 func ptr[T any](value T) *T { return &value }
 

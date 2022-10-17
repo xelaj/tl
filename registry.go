@@ -10,11 +10,10 @@ import (
 	"reflect"
 )
 
-// key is crc code, value is name of constructor
+// key is crc code, value is name of constructor.
 type enumNames = map[crc32]string
 
-type Registry interface {
-}
+type Registry interface{}
 
 // ObjectRegistry is a type, which handles code generated schema, and could be
 // useful for spawning TL objects. Unlike RawSchemaRegistry, it can work only
@@ -50,7 +49,7 @@ func (r *ObjectRegistry) pushObject(crc crc32, typ reflect.Type) {
 func (r *ObjectRegistry) spawnObject(crc crc32) (reflect.Value, error) {
 	_type, ok := r.objects[crc]
 	if !ok {
-		return reflect.Value{}, fmt.Errorf("object with crc 0x%08x not found", crc)
+		return reflect.Value{}, ErrObjectNotRegistered(crc)
 	}
 
 	v := reflect.New(_type).Elem()

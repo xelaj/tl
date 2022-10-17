@@ -3,7 +3,8 @@
 // This file is a part of tl package.
 // See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
 
-//revive:disable:add-constant It's a test file, we can't avoid magic constants
+//revive:disable:add-constant    // It's a test file, we can't avoid magic constants
+//revive:disable:function-length // who cares for test files
 
 package tl_test
 
@@ -31,6 +32,8 @@ func BenchmarkEncoder(b *testing.B) {
 }
 
 func TestDecode(t *testing.T) {
+	t.Parallel()
+
 	for _, tt := range []struct {
 		name     string
 		data     []byte
@@ -107,6 +110,8 @@ func TestDecode(t *testing.T) {
 // bool. Decoder doesn't support any empty interfaces, cause it has strict rules
 // about types.
 func TestDecodeBool(t *testing.T) {
+	t.Parallel()
+
 	for _, tt := range []struct {
 		name     string
 		data     []byte
@@ -140,6 +145,8 @@ func TestDecodeBool(t *testing.T) {
 }
 
 func TestDecodeUnknown(t *testing.T) {
+	t.Parallel()
+
 	for _, tt := range []struct {
 		name            string
 		data            []byte
@@ -284,6 +291,8 @@ func TestDecodeUnknown(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
+	t.Parallel()
+
 	for _, tt := range []struct {
 		name    string
 		obj     any
@@ -383,6 +392,8 @@ func TestEncode(t *testing.T) {
 
 // checking that serializing and deserializing again got same result.
 func TestEquality(t *testing.T) {
+	t.Parallel()
+
 	for _, tt := range []struct {
 		name string
 		obj  any

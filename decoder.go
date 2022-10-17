@@ -18,8 +18,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const readCRCWrapper = "read crc"
-
 func Unmarshal(b []byte, res any) error {
 	return NewDecoder(bytes.NewBuffer(b)).Decode(res)
 }
@@ -34,7 +32,7 @@ type UnmarshalState interface {
 }
 
 // A Decoder reads and decodes TL values from an input stream.
-type Decoder struct {
+type Decoder struct { //nolint:govet // false positive for fieldalignment
 	r           bufio.Reader
 	peekedBytes int
 
@@ -95,7 +93,7 @@ func (d *Decoder) Decode(res any) error {
 func (d *Decoder) DecodeUnknown() (any, error) {
 	crc, err := d.popCRC()
 	if err != nil {
-		return nil, errors.Wrap(err, "getting crc code of decoded object")
+		return nil, errReadCRC{err}
 	}
 
 	switch crc {
@@ -142,12 +140,12 @@ func (d *Decoder) GetRestOfMessage() ([]byte, error) {
 	return io.ReadAll(&d.r) //nolint:wrapcheck // must not be wrapped
 }
 
-// DumpWithoutRead dumps all data without reading it. It could be useful for
-// debugging. Note that default cache is 4096 bytes length, so if your message
-// is bigger, use NewDecoderWith.
-func (d *Decoder) DumpWithoutRead() ([]byte, error) {
-	// TODO: finish it.
-	return io.ReadAll(&d.r) //nolint:wrapcheck // must not be wrapped
+func (d *Decoder) peekPadding(msgSize int) (err error) {
+	if p := pad(msgSize, WordLen); p > 0 {
+		_, err = d.peek(p)
+	}
+
+	return err
 }
 
 func (d *Decoder) peek(size int) ([]byte, error) {
@@ -171,8 +169,8 @@ func (d *Decoder) success() {
 }
 
 func (d *Decoder) decodeValue(value reflect.Value) error {
-	if value.Type().Implements(unmarshalerTyp) {
-		return value.Interface().(Unmarshaler).UnmarshalTL(d.provider())
+	if unmarshaler, ok := value.Interface().(Unmarshaler); ok {
+		return unmarshaler.UnmarshalTL(d.provider()) //nolint:wrapcheck // makes no sense
 	}
 
 	// extra case
@@ -277,7 +275,7 @@ func (d *Decoder) decodeVector(v reflect.Value, ignoreCRC bool) error {
 	if !ignoreCRC {
 		crc, err := d.popCRC()
 		if err != nil {
-			return errors.Wrap(err, readCRCWrapper)
+			return errReadCRC{err}
 		}
 
 		if crc != crcVector {
@@ -299,7 +297,7 @@ func (d *Decoder) decodeVector(v reflect.Value, ignoreCRC bool) error {
 		v.Set(reflect.MakeSlice(v.Type(), int(size), int(size)))
 
 	default:
-		panic("unreachable")
+		unreachable()
 	}
 
 	for i := 0; i < int(size); i++ {
@@ -314,7 +312,7 @@ func (d *Decoder) decodeVector(v reflect.Value, ignoreCRC bool) error {
 func (d *Decoder) decodeInterface(v reflect.Value) error {
 	crc, err := d.popCRC()
 	if err != nil {
-		return errors.Wrap(err, readCRCWrapper)
+		return errReadCRC{err}
 	}
 
 	o, err := d.registry.spawnObject(crc)
@@ -365,11 +363,11 @@ func (d *Decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
 	if !ignoreCRC {
 		gotCrc, err := d.popCRC()
 		if err != nil {
-			return errors.Wrap(err, readCRCWrapper)
+			return errReadCRC{err}
 		}
 
 		if gotCrc != crc {
-			return fmt.Errorf("invalid crc code: got 0x%08x; want 0x%08x", gotCrc, crc)
+			return ErrInvalidCRC{Got: gotCrc, Want: crc}
 		}
 	}
 
@@ -474,8 +472,7 @@ func (d *Decoder) popBool() (bool, error) {
 	case crcFalse:
 		return false, nil
 	default:
-		const format = "want a 0x%08x (true) or 0x%08x (false); got 0x%08x"
-		return false, fmt.Errorf(format, crcTrue, crcFalse, crc)
+		return false, ErrInvalidBoolCRC(crc)
 	}
 }
 
@@ -519,10 +516,8 @@ func (d *Decoder) popMessage() ([]byte, error) {
 		return nil, errors.Wrapf(err, "reading message data with len of %v", realSize)
 	}
 
-	if p := pad(readLen, WordLen, realSize); p > 0 {
-		if _, err = d.peek(p); err != nil {
-			return nil, errors.Wrapf(err, "reading %v last void bytes", p)
-		}
+	if err := d.peekPadding(readLen + realSize); err != nil {
+		return nil, errors.Wrapf(err, "reading void bytes")
 	}
 
 	d.success()

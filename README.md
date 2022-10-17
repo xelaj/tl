@@ -101,7 +101,31 @@ func main() {
 
 ### Run codegen
 
-TODO
+```sh
+🔘 $ brew install tlgen
+
+     Processing... Done!
+
+🟢 $ cat schema.tl | tlgen generate \
+        --package-name="github.com/username/tonlib" \
+        --output="./path/to/generate" \
+        --file-prefix="tl" \      # ➡ tl_stuff_gen.go or tl_gen.go
+        --split-files             # ➡ split by 4 files depend on object type
+
+🟢 $ ls ./path/to/generate
+
+     drwxr-xr-x+   4 username  staff   3.3K Oct 11 2049 .
+     drwxr-xr-x  104 username  staff   224B Oct 11 2049 ..
+     -rw-rw-r--    4 username  staff   4.1K Oct 11 2049 tl_enums_gen.go
+     -rw-rw-r--    4 username  staff   900B Oct 11 2049 tl_init_gen.go
+     -rw-rw-r--    4 username  staff   1.8K Oct 11 2049 tl_interfaces_gen.go
+     -rw-rw-r--    4 username  staff   3.2K Oct 11 2049 tl_methods_gen.go
+
+🟢 $ # Tadah! You have multiple files, but you can combine them into single one!
+
+```
+
+[![Run in playground](https://t.ly/ZA5D)](https://go.dev/play/)
 
 ### Parse messages without codegen
 

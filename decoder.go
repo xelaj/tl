@@ -26,9 +26,18 @@ func UnmarshalUnknown(b []byte) (any, error) {
 	return NewDecoder(bytes.NewBuffer(b)).DecodeUnknown()
 }
 
+type RealDecoder interface {
+	SetRegistry(registry Registry) Decoder
+
+	Decode(res any) error
+}
+
 type UnmarshalState interface {
 	// ReadWords reads words from unmarshaler with fixed size of word.
 	io.Reader
+
+	PopBool() (bool, error)
+	PopCRC() (crc32, error)
 }
 
 // A Decoder reads and decodes TL values from an input stream.
@@ -189,9 +198,9 @@ func (d *Decoder) decodeValue(value reflect.Value) error {
 	switch kind := value.Kind(); kind { //nolint:exhaustive // only invalid? rly?
 	// unsupported
 	case reflect.Chan, reflect.Func, reflect.Uintptr, reflect.UnsafePointer:
-		return errors.New(value.Kind().String() + " isn't supported")
+		return ErrUnsupportedType{Type: value.Type()}
 
-	// supported, but TL is not supported 8 and 16 bit numbers
+	// supported, but TL doesn't support 8 and 16 bit numbers
 	case reflect.Int, reflect.Int8, reflect.Int16,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint64:
 		// as discussed in encoder: we can't be sure that we decode 4 bytes
@@ -402,7 +411,7 @@ func (d *Decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
 			}
 			bitflagValue := f&(1<<tags.BitFlags.BitPosition) > 0
 
-			if tags.Implicit() {
+			if tags.Implicit {
 				// implicit can be only boolean, so leave this initialization alone
 				v.Field(i).Set(reflect.ValueOf(bitflagValue))
 
@@ -546,6 +555,9 @@ func (m *unmarshaler) Read(b []byte) (int, error) {
 
 	return copy(b, read), nil
 }
+
+func (m *unmarshaler) PopBool() (bool, error) { return m.d().popBool() }
+func (m *unmarshaler) PopCRC() (crc32, error) { return m.d().popCRC() }
 
 /*
 	crcV := v.MapIndex(reflect.ValueOf(MapCrcKey))

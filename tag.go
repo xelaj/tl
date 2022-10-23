@@ -23,6 +23,16 @@ const (
 	maxBitflagIndex = 32
 )
 
+type structTag struct {
+	BitFlags  *bitflag
+	Implicit  bool
+	Name      string
+	IsBitflag bool
+}
+
+// ParseTag is a function which parses struct field tag for structes, defined by
+// you.
+//
 // how tag could look:
 //
 //	// field named somefield, it could be empty, value is boolean, so it can
@@ -31,19 +41,47 @@ const (
 //
 //	// value is abcd, it's required to exist in serialized
 //	`tl:"abcd"`
-type structTag struct {
-	BitFlags  *bitflag
-	Name      string
-	IsBitflag bool
+func ParseTag(tag, defaultName string) (t *structTag, err error) {
+	parts := strings.Split(tag, ",")
+	name := parts[0]
+	if name == "" {
+		name = defaultName
+	}
+
+	t = &structTag{}
+	for _, option := range parts[1:] {
+		switch {
+		case option == implicitFlag:
+			t.Implicit = true
+
+		case option == isBitflagFlag:
+			t.IsBitflag = true
+
+		case strings.HasPrefix(option, omitemptyPrefix):
+			if t.BitFlags, err = parseOmitemptyTag(option); err != nil {
+				return nil, err
+			}
+
+		default:
+			return nil, errors.Wrap(ErrInvalidTagOption, option)
+		}
+	}
+	if err := t.valid(); err != nil {
+		return nil, err
+	}
+
+	return t, nil
 }
 
-func (t *structTag) Ignore() bool   { return t.Name == "-" }
-func (t *structTag) Implicit() bool { return t.BitFlags != nil && t.BitFlags.Implicit }
+func (t *structTag) Ignore() bool { return t.Name == "-" }
 
 func (t *structTag) String() string {
 	res := t.Name
 	if t.BitFlags != nil {
 		res += "," + t.BitFlags.String()
+	}
+	if t.Implicit {
+		res += "," + implicitFlag
 	}
 	if t.IsBitflag {
 		res += "," + isBitflagFlag
@@ -52,87 +90,64 @@ func (t *structTag) String() string {
 	return res
 }
 
-type bitflag struct {
-	TargetField string
-	BitPosition uint8
-	Implicit    bool
-}
-
-func (t *bitflag) String() string {
-	res := t.TargetField + ":" + strconv.Itoa(int(t.BitPosition))
-	if t.Implicit {
-		res += "," + implicitFlag
-	}
-
-	return res
-}
-
-func (t *bitflag) valid() error {
+func (t *structTag) valid() error {
 	if t == nil {
 		return nil
 	}
-	if t.BitPosition >= maxBitflagIndex {
-		return ErrBitflagTooHigh
+	if t.Implicit && (t.BitFlags == nil || t.BitFlags.TargetField == "") {
+		return ErrImplicitNoTarget
 	}
-	if t.Implicit && t.TargetField == "" {
-		return errors.New(implicitFlag + " defined without target field to trigger")
+
+	if f := t.BitFlags; f != nil {
+		if f.BitPosition > maxBitflagIndex {
+			return ErrBitflagTooHigh
+		}
+		// other checks for omitempty tag goes here
 	}
 
 	return nil
 }
 
-func parseTag(tag, defaultName string) (*structTag, error) {
-	parts := strings.Split(tag, ",")
-	name := parts[0]
-	if name == "" {
-		name = defaultName
+type bitflag struct {
+	TargetField string
+	BitPosition uint8
+}
+
+func (t *bitflag) String() string {
+	return strings.Join([]string{
+		omitemptyPrefix, t.TargetField, strconv.Itoa(int(t.BitPosition)),
+	}, ":")
+}
+
+const omitemptyParts = 3
+
+func parseOmitemptyTag(opt string) (*bitflag, error) {
+	parts := strings.Split(opt, ":")
+
+	if len(parts) != omitemptyParts {
+		return nil, errors.Wrap(ErrInvalidTagFormat, omitemptyPrefix)
 	}
 
-	var optionalField *bitflag
-	var isBitflag bool
-	for _, option := range parts[1:] {
-		switch {
-		case option == implicitFlag:
-			if optionalField == nil {
-				optionalField = &bitflag{}
-			}
-			optionalField.Implicit = true
-
-			continue
-
-		case option == isBitflagFlag:
-			isBitflag = true
-
-		case strings.HasPrefix(option, omitemptyPrefix):
-			parts := strings.Split(option, ":")
-
-			const omitemptyParts = 3
-			if len(parts) != omitemptyParts {
-				return nil, errors.Wrap(ErrInvalidTagFormat, omitemptyPrefix)
-			}
-
-			if optionalField == nil {
-				optionalField = &bitflag{}
-			}
-
-			optionalField.TargetField = parts[1]
-			pos, err := strconv.ParseUint(parts[2], 10, 5) //nolint:gomnd // obvious
-			if err != nil {
-				return nil, errors.Wrap(ErrInvalidTagFormat, omitemptyPrefix)
-			}
-			optionalField.BitPosition = uint8(pos)
-
-		default:
-			return nil, errors.Wrap(ErrInvalidTagOption, option)
-		}
-	}
-	if err := optionalField.valid(); err != nil {
-		return nil, err
+	pos, err := parseUintMax32(parts[2])
+	if err != nil {
+		return nil, errors.Wrap(err, omitemptyPrefix)
 	}
 
-	return &structTag{
-		Name:      name,
-		BitFlags:  optionalField,
-		IsBitflag: isBitflag,
+	return &bitflag{
+		TargetField: parts[1],
+		BitPosition: pos,
 	}, nil
+}
+
+const (
+	bit32       = 5  // 5 bits to make 32 different variants
+	defaultBase = 10 // base 10 of numbers
+)
+
+func parseUintMax32(s string) (uint8, error) {
+	if pos, err := strconv.ParseUint(s, defaultBase, bit32); err == nil {
+		return uint8(pos), nil
+	}
+
+	return 0, ErrInvalidTagFormat
 }

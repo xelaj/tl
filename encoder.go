@@ -196,7 +196,7 @@ func (e *Encoder) encodeStruct(v reflect.Value) error {
 			continue
 		}
 
-		if _, ok := properties.bitflags[i]; ok && tag.Implicit() {
+		if _, ok := properties.bitflags[i]; ok && tag.Implicit {
 			continue
 		}
 

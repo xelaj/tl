@@ -15,7 +15,7 @@ type Object struct {
 	isMethod bool
 }
 
-func (o *Object) objType() ObjectType {
+func (o *Object) ObjType() ObjectType {
 	if o.isMethod {
 		return ObjectTypeMethod
 	}
@@ -95,7 +95,7 @@ func (o *Object) String() string {
 func (o *Object) Comments() []string {
 	res := []string{}
 	if o.Comment != "" {
-		res = append(res, "// @"+o.objType().String()+" "+o.Comment)
+		res = append(res, "// @"+o.ObjType().String()+" "+o.Comment)
 	}
 
 	return append(res, o.Fields.Comments()...)

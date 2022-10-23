@@ -22,7 +22,7 @@ var (
 
 // Object is default interface, which ANY struct must implement to decode it in tl format.
 type Object interface {
-	CRC() uint32
+	CRC() crc32
 }
 
 const MapCrcKey = "_crc"
@@ -70,3 +70,28 @@ func boolToCRC(v bool) crc32 { //revive:disable:flag-parameter // no, it's not
 
 	return crcFalse
 }
+
+// AnyConstructor это специальный тип для декодера, который позволяет ограничить
+// доступный набор конструкторов.
+type AnyConstructor[T Object] struct {
+	Constructor func(crc32) T
+	Result      T
+}
+
+func (b *AnyConstructor[T]) UnmarshalTL(r UnmarshalState) error {
+	crc, err := r.PopCRC()
+	if err != nil {
+		return errReadCRC{err}
+	}
+
+	obj := b.Constructor(crc)
+	if Object(obj) == nil {
+		return ErrObjectNotRegistered(crc)
+	}
+
+	// r.Unmarshal(obj)
+	return nil
+}
+
+func IsZeroValue[T comparable](t T) bool { return t == *new(T) }
+func IsZeroValueReflect(t any) bool      { return reflect.ValueOf(&t).Elem().IsZero() }

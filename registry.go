@@ -12,8 +12,16 @@ import (
 
 // key is crc code, value is name of constructor.
 type enumNames = map[crc32]string
+type typeName = string
 
-type Registry interface{}
+type Registry interface {
+	ConstructObject(typ typeName, code crc32) (Object, structFields, bool)
+}
+
+type interfaceRemapper interface {
+	Registry
+	GetNameOfType(reflect.Type) string
+}
 
 // ObjectRegistry is a type, which handles code generated schema, and could be
 // useful for spawning TL objects. Unlike RawSchemaRegistry, it can work only
@@ -63,6 +71,29 @@ func (r *ObjectRegistry) spawnObject(crc crc32) (reflect.Value, error) {
 
 	return v, nil
 }
+
+/*
+func (r *ObjectRegistry) ConstructObject(typ typeName, code crc32) (Object, *structFields, bool) {
+	// special case, when we absolutely don't know what's the type of our object
+	if typ == "" {
+		for _, c := range r.constructors {
+			_ = c
+			//if obj := c(code); obj != nil {
+			//	return obj,
+			//}
+		}
+	}
+
+	constructor, ok := r.constructors[typ]
+	if !ok {
+		return nil, nil, false
+	}
+	if obj := constructor(code); obj != nil {
+		return obj, nil, true
+	}
+	return nil, nil, false
+}
+*/
 
 // orphanType is a type definition, which doesn't have any struct type to it.
 type orphanType struct {
@@ -122,7 +153,7 @@ type fieldInterface string
 
 func (fieldInterface) _isFieldType() {}
 
-//nolint:gochecknoglobals // obvious reason to fo that.
+//nolint:gochecknoglobals // obvious reason to do that.
 var defaultRegistry = &ObjectRegistry{}
 
 func RegisterObjects(objects ...Object) { defaultRegistry.RegisterObjects(objects...) }
@@ -171,7 +202,7 @@ func (r *ObjectRegistry) registerObject(o Object) {
 		fTyp := typ.Field(i)
 		typName := typ.Name() + "." + fTyp.Name
 
-		tag, err := parseTag(fTyp.Tag.Get(tagName), fTyp.Name)
+		tag, err := ParseTag(fTyp.Tag.Get(tagName), fTyp.Name)
 		if err != nil {
 			panic(fmt.Sprintf("parsing tag of %v: %v", typName, err.Error()))
 		}
@@ -200,7 +231,7 @@ func (r *ObjectRegistry) registerObject(o Object) {
 				bitIndex:   int(tag.BitFlags.BitPosition),
 			}
 
-			if tag.Implicit() && fTyp.Type.Kind() != reflect.Bool {
+			if tag.Implicit && fTyp.Type.Kind() != reflect.Bool {
 				panic(fmt.Sprintf("%v: %q tag works only for bool fields", typName, implicitFlag))
 			}
 		}
@@ -236,3 +267,16 @@ func (r *ObjectRegistry) registerEnum(enum Enum) {
 	}
 	r.enumNames[enum.CRC()] = enum.String()
 }
+
+type tlType uint8
+
+const (
+	typeBool tlType = iota
+	typeInt
+	typeLong
+	typeDouble
+	typeString
+	typeVector
+	typeObject
+	typeInterface
+)

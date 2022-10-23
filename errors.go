@@ -15,6 +15,7 @@ const (
 	ErrImplicitInt   = errorConst("value must be converted to int32, int64 or uint32 explicitly")
 
 	ErrBitflagTooHigh   = errorConst("trigger bit is more than 32")
+	ErrImplicitNoTarget = errorConst(implicitFlag + " defined without target field to trigger")
 	ErrInvalidTagOption = errorConst("invalid option")
 	ErrInvalidTagFormat = errorConst("invalid tag format")
 )

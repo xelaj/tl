@@ -28,6 +28,6 @@ func createCrcFunc(typ string, crc uint32) *jen.Statement {
 		Id("{" + jen.Return(jen.Id(hex)).GoString() + "}")
 }
 
-func generateMethod(m *schema.ObjectMethod) *jen.Statement {
+func generateMethod(m *schema.Object) *jen.Statement {
 	return nil
 }

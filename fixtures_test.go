@@ -9,10 +9,6 @@
 package tl_test
 
 import (
-	"fmt"
-	"math"
-	"math/big"
-
 	. "github.com/xelaj/tl"
 )
 
@@ -202,8 +198,8 @@ type InitConnectionParams struct {
 func (*InitConnectionParams) CRC() uint32 { return 0xc1cd5ea9 }
 
 type ResPQ struct {
-	Nonce        *int128
-	ServerNonce  *int128
+	Nonce        *Int128
+	ServerNonce  *Int128
 	Pq           []byte
 	Fingerprints []int64
 }
@@ -234,54 +230,3 @@ type PollAnswer struct {
 }
 
 func (*PollAnswer) CRC() uint32 { return 0x6ca9c2e9 }
-
-const int128Len = 16 // int128 size in bytes
-
-type int128 struct{ big.Int }
-
-func newInt128(value int) *int128 {
-	i := big.NewInt(int64(value))
-
-	return &int128{*i}
-}
-
-func (i *int128) MarshalTL(e MarshalState) error {
-	_, err := e.Write(bigIntBytes(&i.Int, int128Len*8))
-
-	return err //nolint:wrapcheck // errors from provider must not be wrapped
-}
-
-func (i *int128) UnmarshalTL(d UnmarshalState) error {
-	val := make([]byte, int128Len)
-	if _, err := d.Read(val); err != nil {
-		return err //nolint:wrapcheck // why not, it's a fixtures
-	}
-	i.Int = *big.NewInt(0).SetBytes(val)
-
-	return nil
-}
-
-//revive:disable:function-length
-
-// allowed bitsize is 8, 16, 32, 64, 128, 256, 512, 1024 and 2048 bits.
-func bigIntBytes(v *big.Int, bitsize int) []byte {
-	bitsizeSquaredFloat := math.Log2(float64(bitsize))
-	if _, f := math.Modf(bitsizeSquaredFloat); f != 0 {
-		panic(fmt.Sprintf("bitsize not squaring by 2: bitsize %v", bitsize))
-	}
-	if bitsizeSquaredFloat > 11 {
-		panic(fmt.Sprintf("bitsize is larger than 2048 bit: bitsize %v", bitsize))
-	}
-
-	vbytes := v.Bytes()
-	vbytesLen := len(vbytes)
-
-	offset := bitsize/8 - vbytesLen
-	if offset < 0 {
-		panic(fmt.Sprintf("bitsize too small: have %v, want at least %v", bitsize, vbytes))
-	}
-
-	return append(make([]byte, offset), vbytes...)
-}
-
-//revive:enable

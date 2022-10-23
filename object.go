@@ -7,6 +7,7 @@ package tl
 
 import (
 	"fmt"
+	"math/big"
 	"reflect"
 )
 
@@ -20,16 +21,17 @@ var (
 	uint32Typ    = reflect.TypeOf((*uint32)(nil)).Elem()
 )
 
-// Object is default interface, which ANY struct must implement to decode it in tl format.
+// Object is default interface, which ANY struct must implement to decode it in
+// tl format.
 type Object interface {
 	CRC() crc32
 }
 
 const MapCrcKey = "_crc"
 
-// Enum is an interface which implementations are ONLY objects without any fields.
-//
-// If enum is not set (null in TL terms), it MUST return zero value in CRC() method.
+// Enum is an interface which implementations are ONLY objects without any
+// fields. If enum is not set (null in TL terms), it MUST return zero value in
+// CRC() method.
 type Enum interface {
 	Object
 	fmt.Stringer
@@ -46,9 +48,11 @@ type Unmarshaler interface {
 const (
 	bitsInByte = 8 // cause we don't want store magic numbers
 
-	WordLen   = 32 / bitsInByte // length of word in tl is 32 bits
-	LongLen   = 64 / bitsInByte // int64 size in bytes
-	DoubleLen = 64 / bitsInByte // float64 size in bytes
+	WordLen   = 32 / bitsInByte  // length of word in tl is 32 bits
+	LongLen   = 64 / bitsInByte  // int64 size in bytes
+	DoubleLen = 64 / bitsInByte  // float64 size in bytes
+	Int128Len = 128 / bitsInByte // int128 size in bytes
+	Int256Len = 256 / bitsInByte // int256 size in bytes
 
 	// according to typelang specification, there is no able to encode value in
 	// 1 byte more than 253 (max is 252). why it's 253? Idk. Why not 254 and 255
@@ -69,6 +73,68 @@ func boolToCRC(v bool) crc32 { //revive:disable:flag-parameter // no, it's not
 	}
 
 	return crcFalse
+}
+
+// Int128 is alias-like type for fixed size of big int (1024 bit value). It
+// using only for tl objects encoding cause native big.Int isn't supported for
+// en(de)coding
+type Int128 struct{ big.Int }
+
+// NewInt128 creates int128 with zero value
+func NewInt128(value int) *Int128 { return &Int128{val(big.NewInt(int64(value)))} }
+
+// RandomInt128 creates int128 with random value
+func RandomInt128() *Int128 { return &Int128{val(big.NewInt(0).SetBytes(randBytes(Int128Len)))} }
+
+// MarshalTL implements tl marshaler from this package. Just don't use it by
+// your hands, tl.Encoder does all what you need
+func (i *Int128) MarshalTL(e *Encoder) error {
+	_, err := e.write(bigIntBytes(&i.Int, Int128Len*bitsInByte))
+	return err
+}
+
+// UnmarshalTL implements tl unmarshaler from this package. Just don't use it by
+// your hands, tl.Decoder does all what you need
+func (i *Int128) UnmarshalTL(d *Decoder) error {
+	v, err := d.peek(Int128Len)
+	if err != nil {
+		return err
+	}
+	d.success()
+	i.Int = val(big.NewInt(0).SetBytes(v))
+	return nil
+}
+
+// Int256 is alias-like type for fixed size of big int (2048 bit value). It
+// using only for tl objects encoding cause native big.Int isn't supported for
+// en(de)coding
+type Int256 struct {
+	big.Int
+}
+
+// NewInt256 creates int256 with zero value
+func NewInt256(value int) *Int256 { return &Int256{val(big.NewInt(int64(value)))} }
+
+// RandomInt256 creates int256 with random value
+func RandomInt256() *Int256 { return &Int256{val(big.NewInt(0).SetBytes(randBytes(Int256Len)))} }
+
+// MarshalTL implements tl marshaler from this package. Just don't use it by
+// your hands, tl.Encoder does all what you need
+func (i *Int256) MarshalTL(e *Encoder) error {
+	_, err := e.write(bigIntBytes(&i.Int, Int256Len*bitsInByte))
+	return err
+}
+
+// UnmarshalTL implements tl unmarshaler from this package. Just don't use it by
+// your hands, tl.Decoder does all what you need
+func (i *Int256) UnmarshalTL(d *Decoder) error {
+	v, err := d.peek(Int256Len)
+	if err != nil {
+		return err
+	}
+	d.success()
+	i.Int = val(big.NewInt(0).SetBytes(v))
+	return nil
 }
 
 // AnyConstructor это специальный тип для декодера, который позволяет ограничить

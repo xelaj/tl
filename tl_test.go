@@ -332,8 +332,8 @@ func TestEncode(t *testing.T) {
 	}, {
 		name: "respq",
 		obj: &ResPQ{
-			Nonce:        newInt128(123),
-			ServerNonce:  newInt128(321),
+			Nonce:        NewInt128(123),
+			ServerNonce:  NewInt128(321),
 			Pq:           []byte{1, 2, 3},
 			Fingerprints: []int64{322, 1337},
 		},

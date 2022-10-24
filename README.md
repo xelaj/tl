@@ -11,7 +11,7 @@
 <!-- it's unable to past links as references, when you trying to center links-->
 <p align="center">
 <a href="https://pkg.go.dev/github.com/xelaj/tl">
-<img src="https://img.shields.io/badge/go.dev-reference-007d9c?label=%e2%a0%80&logo=go&logoColor=white&labelColor=27303B&style=for-the-badge">
+<img src="https://t.ly/9rHL">
 </a>
 <a href="https://goreportcard.com/report/github.com/xelaj/tl">
 <img src="https://img.shields.io/static/v1?label=go+report&message=A%2b&color=success&labelColor=27303B&style=for-the-badge">

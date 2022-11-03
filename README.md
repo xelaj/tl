@@ -11,7 +11,7 @@
 <!-- it's unable to past links as references, when you trying to center links-->
 <p align="center">
 <a href="https://pkg.go.dev/github.com/xelaj/tl">
-<img src="https://t.ly/9rHL">
+<img src="https://gist.githubusercontent.com/quenbyako/9aae4a4ad4ff0f9bab9097f316ce475f/raw/go_reference.svg">
 </a>
 <a href="https://goreportcard.com/report/github.com/xelaj/tl">
 <img src="https://img.shields.io/static/v1?label=go+report&message=A%2b&color=success&labelColor=27303B&style=for-the-badge">
@@ -96,7 +96,7 @@ func main() {
 }
 ```
 
-[![Run in playground](https://t.ly/SGyz)](https://go.dev/play/p/Cw25cFM-WDx)
+[![Run in playground][shield_go_play]](https://go.dev/play/p/Cw25cFM-WDx)
 
 ### Run codegen
 
@@ -124,7 +124,7 @@ func main() {
 
 ```
 
-[![Run in playground](https://t.ly/ZA5D)](https://go.dev/play/)
+[![View demo][shield_view_demo]](https://go.dev/play/)
 
 ### Parse messages without codegen
 
@@ -262,3 +262,6 @@ Created with love 💜 and magic 🦄 </br> Xelaj Software, 2022
 [gh_discussions]:     https://github.com/xelaj/tl/discussions
 [gh_discussions_faq]: https://github.com/xelaj/tl/discussions/categories/q-a
 [CoC]:                https://github.com/xelaj/tl/blob/-/.github/CODE_OF_CONDUCT.md
+
+[shield_go_play]:    https://gist.githubusercontent.com/quenbyako/9aae4a4ad4ff0f9bab9097f316ce475f/raw/go_playground.svg
+[shield_view_demo]:  https://gist.githubusercontent.com/quenbyako/9aae4a4ad4ff0f9bab9097f316ce475f/raw/view_demo.svg

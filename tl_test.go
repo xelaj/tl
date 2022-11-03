@@ -440,3 +440,109 @@ func TestEquality(t *testing.T) {
 		})
 	}
 }
+
+// checking that serializing and deserializing again got same result.
+func TestParseTag(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name      string
+		tag       string
+		fieldName string
+		want      *StructTag
+		wantErr   assert.ErrorAssertionFunc
+	}{{
+		tag:       "",
+		fieldName: "SomeField",
+		want: &StructTag{
+			Name: "SomeField",
+		},
+	}, {
+		tag:       "some_field",
+		fieldName: "SomeField",
+		want: &StructTag{
+			Name: "some_field",
+		},
+	}, {
+		tag:       ",omitempty:bitflag:30",
+		fieldName: "SomeField",
+		want: &StructTag{
+			Name: "SomeField",
+			BitFlags: &Bitflag{
+				TargetField: "bitflag",
+				BitPosition: 30,
+			},
+		},
+	}, {
+		tag:       ",omitempty:bitflag:30,implicit",
+		fieldName: "SomeField",
+		want: &StructTag{
+			Name: "SomeField",
+			BitFlags: &Bitflag{
+				TargetField: "bitflag",
+				BitPosition: 30,
+			},
+			Implicit: true,
+		},
+	}, {
+		tag:       ",omitempty:otherflag",
+		fieldName: "",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",omitempty:otherflag:1000",
+		fieldName: "",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",omitempty:otherflag:-1",
+		fieldName: "",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",implicit",
+		fieldName: "",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",bitflag",
+		fieldName: "SomeField",
+		want: &StructTag{
+			Name:      "SomeField",
+			IsBitflag: true,
+		},
+	}, {
+		tag:       "some_field,abracadabre",
+		fieldName: "SomeField",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",omitempty:bitflags:0,implicit,bitflag",
+		fieldName: "SomeField",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",implicit",
+		fieldName: "",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",omitempty:global_bitflags:0,bitflag",
+		fieldName: "subflags",
+		want: &StructTag{
+			Name: "subflags",
+			BitFlags: &Bitflag{
+				TargetField: "global_bitflags",
+				BitPosition: 0,
+			},
+			IsBitflag: true,
+		},
+	}} {
+		tt := tt // for parallel tests
+		tt.wantErr = noErrAsDefault(tt.wantErr)
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ParseTag(tt.tag, tt.fieldName)
+			if !tt.wantErr(t, err) || err != nil {
+				return
+			}
+
+			require.Equal(t, tt.want, got)
+		})
+	}
+}

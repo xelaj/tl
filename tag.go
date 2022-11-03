@@ -23,8 +23,8 @@ const (
 	maxBitflagIndex = 32
 )
 
-type structTag struct {
-	BitFlags  *bitflag
+type StructTag struct {
+	BitFlags  *Bitflag
 	Implicit  bool
 	Name      string
 	IsBitflag bool
@@ -41,14 +41,16 @@ type structTag struct {
 //
 //	// value is abcd, it's required to exist in serialized
 //	`tl:"abcd"`
-func ParseTag(tag, defaultName string) (t *structTag, err error) {
+func ParseTag(tag, defaultName string) (t *StructTag, err error) {
 	parts := strings.Split(tag, ",")
 	name := parts[0]
 	if name == "" {
 		name = defaultName
 	}
 
-	t = &structTag{}
+	t = &StructTag{
+		Name: name,
+	}
 	for _, option := range parts[1:] {
 		switch {
 		case option == implicitFlag:
@@ -73,9 +75,9 @@ func ParseTag(tag, defaultName string) (t *structTag, err error) {
 	return t, nil
 }
 
-func (t *structTag) Ignore() bool { return t.Name == "-" }
+func (t *StructTag) Ignore() bool { return t.Name == "-" } //cover:ignore
 
-func (t *structTag) String() string {
+func (t *StructTag) String() string { //cover:ignore
 	res := t.Name
 	if t.BitFlags != nil {
 		res += "," + t.BitFlags.String()
@@ -90,30 +92,29 @@ func (t *structTag) String() string {
 	return res
 }
 
-func (t *structTag) valid() error {
-	if t == nil {
+func (t *StructTag) valid() error {
+	switch {
+	case t == nil:
+		return nil
+	case t.Name == "":
+		return ErrTagNameEmpty
+	case t.Implicit && (t.BitFlags == nil || t.BitFlags.TargetField == ""):
+		return ErrImplicitNoTarget
+	case t.Implicit && t.IsBitflag:
+		return ErrImplicitBitflag
+	case t.BitFlags != nil && t.BitFlags.BitPosition > maxBitflagIndex:
+		return ErrBitflagTooHigh
+	default:
 		return nil
 	}
-	if t.Implicit && (t.BitFlags == nil || t.BitFlags.TargetField == "") {
-		return ErrImplicitNoTarget
-	}
-
-	if f := t.BitFlags; f != nil {
-		if f.BitPosition > maxBitflagIndex {
-			return ErrBitflagTooHigh
-		}
-		// other checks for omitempty tag goes here
-	}
-
-	return nil
 }
 
-type bitflag struct {
+type Bitflag struct {
 	TargetField string
 	BitPosition uint8
 }
 
-func (t *bitflag) String() string {
+func (t *Bitflag) String() string {  //cover:ignore
 	return strings.Join([]string{
 		omitemptyPrefix, t.TargetField, strconv.Itoa(int(t.BitPosition)),
 	}, ":")
@@ -121,7 +122,7 @@ func (t *bitflag) String() string {
 
 const omitemptyParts = 3
 
-func parseOmitemptyTag(opt string) (*bitflag, error) {
+func parseOmitemptyTag(opt string) (*Bitflag, error) {
 	parts := strings.Split(opt, ":")
 
 	if len(parts) != omitemptyParts {
@@ -133,7 +134,7 @@ func parseOmitemptyTag(opt string) (*bitflag, error) {
 		return nil, errors.Wrap(err, omitemptyPrefix)
 	}
 
-	return &bitflag{
+	return &Bitflag{
 		TargetField: parts[1],
 		BitPosition: pos,
 	}, nil

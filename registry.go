@@ -163,7 +163,7 @@ type structFields struct {
 	// key is an index of optional field in list of fields in object
 	// value is bit, which you need to trigger
 	bitflags map[int]bitflagBit
-	tags     []structTag
+	tags     []StructTag
 }
 
 func (s *structFields) isFieldOptional(fieldIndex int) bool {
@@ -193,7 +193,7 @@ func (r *ObjectRegistry) registerObject(o Object) {
 		typ = typ.Elem()
 	}
 	typData := structFields{
-		tags:     make([]structTag, typ.NumField()),
+		tags:     make([]StructTag, typ.NumField()),
 		bitflags: make(map[int]bitflagBit),
 	}
 

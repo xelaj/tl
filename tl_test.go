@@ -86,128 +86,6 @@ func TestDecode(t *testing.T) {
 			Solution:         ptr("alala"),
 			SolutionEntities: []MessageEntity{},
 		},
-	}} {
-		tt := tt // for parallel tests
-		tt.wantErr = noErrAsDefault(tt.wantErr)
-		got := reflect.New(reflect.TypeOf(tt.expected)).Elem().Interface()
-
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			err := Unmarshal(tt.data, &got)
-
-			if !tt.wantErr(t, err) || err != nil {
-				return
-			}
-
-			assert.Equal(t, tt.expected, got)
-		})
-	}
-}
-
-// specific problem: if you try to create zero boolean value, you won't able to
-// push it to decoder, cause reflect generates empty interface which contains
-// bool. Decoder doesn't support any empty interfaces, cause it has strict rules
-// about types.
-func TestDecodeBool(t *testing.T) {
-	t.Parallel()
-
-	for _, tt := range []struct {
-		name     string
-		data     []byte
-		expected bool
-		wantErr  assert.ErrorAssertionFunc
-	}{{
-		name:     "nakedBooleanObject#00",
-		data:     Hexed("b5757299"),
-		expected: true,
-	}, {
-		name:     "nakedBooleanObject#01",
-		data:     Hexed("379779bc"),
-		expected: false,
-	}} {
-		tt := tt // for parallel tests
-		tt.wantErr = noErrAsDefault(tt.wantErr)
-
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			var got bool
-			err := Unmarshal(tt.data, &got)
-
-			if !tt.wantErr(t, err) || err != nil {
-				return
-			}
-
-			assert.Equal(t, tt.expected, got)
-		})
-	}
-}
-
-func TestDecodeUnknown(t *testing.T) {
-	t.Parallel()
-
-	for _, tt := range []struct {
-		name            string
-		data            []byte
-		hintsForDecoder []reflect.Type
-		expected        any
-		wantErr         assert.ErrorAssertionFunc
-	}{{
-		name: "authSentCode",
-		data: Hexed(`
-			0225005e                                 // crc
-		    02000000                                 // flag
-			        8659bb3d                         // crc AuthSentCodeTypeApp
-					05000000                         // int32
-			12                                       // length of text
-			  316637366461306431353531313539363336   // text
-			                                      00 // padding
-			8c15a372                                 // next type`),
-		expected: &AuthSentCode{
-			Type: &AuthSentCodeTypeApp{
-				Length: 5,
-			},
-			PhoneCodeHash: "1f76da0d1551159636",
-			NextType:      AuthCodeTypeSms,
-		},
-	}, {
-		name: "poll-results",
-		data: Hexed("a3c1dcba1e00000015c4b51c02000000d2da6d3b010000000301020302000000d2da6d3b" +
-			"0000000003040506060000000c00000015c4b51c02000000050000000600000005616c616c610000" +
-			"15c4b51c00000000"),
-		expected: &PollResults{
-			Min: false,
-			Results: []*PollAnswerVoters{
-				{
-					Chosen:  true,
-					Correct: false,
-					Option:  Hexed("010203"),
-					Voters:  2,
-				},
-				{
-					Chosen:  false,
-					Correct: false,
-					Option:  Hexed("040506"),
-					Voters:  6,
-				},
-			},
-			TotalVoters: ptr[int32](12),
-			RecentVoters: []int32{
-				5,
-				6,
-			},
-			Solution:         ptr("alala"),
-			SolutionEntities: []MessageEntity{},
-		},
-	}, {
-		name:     "nakedBooleanObject#00",
-		data:     Hexed("b5757299"),
-		expected: true,
-	}, {
-		name:     "nakedBooleanObject#01",
-		data:     Hexed("379779bc"),
-		expected: false,
 	}, {
 		name: "issue_59", // https://github.com/xelaj/mtproto/issues/59
 		data: Hexed(`
@@ -276,16 +154,57 @@ func TestDecodeUnknown(t *testing.T) {
 	}} {
 		tt := tt // for parallel tests
 		tt.wantErr = noErrAsDefault(tt.wantErr)
+		got := reflect.New(reflect.TypeOf(tt.expected)).Elem().Interface()
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			res, err := UnmarshalUnknown(tt.data)
+			err := Unmarshal(tt.data, &got)
+
 			if !tt.wantErr(t, err) || err != nil {
 				return
 			}
 
-			assert.Equal(t, tt.expected, res)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+// specific problem: if you try to create zero boolean value, you won't able to
+// push it to decoder, cause reflect generates empty interface which contains
+// bool. Decoder doesn't support any empty interfaces, cause it has strict rules
+// about types.
+func TestDecodeBool(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name     string
+		data     []byte
+		expected bool
+		wantErr  assert.ErrorAssertionFunc
+	}{{
+		name:     "nakedBooleanObject#00",
+		data:     Hexed("b5757299"),
+		expected: true,
+	}, {
+		name:     "nakedBooleanObject#01",
+		data:     Hexed("379779bc"),
+		expected: false,
+	}} {
+		tt := tt // for parallel tests
+		tt.wantErr = noErrAsDefault(tt.wantErr)
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var got bool
+			err := Unmarshal(tt.data, &got)
+
+			if !tt.wantErr(t, err) || err != nil {
+				return
+			}
+
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }
@@ -437,6 +356,112 @@ func TestEquality(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, tt.obj, got)
+		})
+	}
+}
+
+// checking that serializing and deserializing again got same result.
+func TestParseTag(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name      string
+		tag       string
+		fieldName string
+		want      *StructTag
+		wantErr   assert.ErrorAssertionFunc
+	}{{
+		tag:       "",
+		fieldName: "SomeField",
+		want: &StructTag{
+			Name: "SomeField",
+		},
+	}, {
+		tag:       "some_field",
+		fieldName: "SomeField",
+		want: &StructTag{
+			Name: "some_field",
+		},
+	}, {
+		tag:       ",omitempty:bitflag:30",
+		fieldName: "SomeField",
+		want: &StructTag{
+			Name: "SomeField",
+			BitFlags: &Bitflag{
+				TargetField: "bitflag",
+				BitPosition: 30,
+			},
+		},
+	}, {
+		tag:       ",omitempty:bitflag:30,implicit",
+		fieldName: "SomeField",
+		want: &StructTag{
+			Name: "SomeField",
+			BitFlags: &Bitflag{
+				TargetField: "bitflag",
+				BitPosition: 30,
+			},
+			Implicit: true,
+		},
+	}, {
+		tag:       ",omitempty:otherflag",
+		fieldName: "",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",omitempty:otherflag:1000",
+		fieldName: "",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",omitempty:otherflag:-1",
+		fieldName: "",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",implicit",
+		fieldName: "",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",bitflag",
+		fieldName: "SomeField",
+		want: &StructTag{
+			Name:      "SomeField",
+			IsBitflag: true,
+		},
+	}, {
+		tag:       "some_field,abracadabre",
+		fieldName: "SomeField",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",omitempty:bitflags:0,implicit,bitflag",
+		fieldName: "SomeField",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",implicit",
+		fieldName: "",
+		wantErr:   assert.Error,
+	}, {
+		tag:       ",omitempty:global_bitflags:0,bitflag",
+		fieldName: "subflags",
+		want: &StructTag{
+			Name: "subflags",
+			BitFlags: &Bitflag{
+				TargetField: "global_bitflags",
+				BitPosition: 0,
+			},
+			IsBitflag: true,
+		},
+	}} {
+		tt := tt // for parallel tests
+		tt.wantErr = noErrAsDefault(tt.wantErr)
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ParseTag(tt.tag, tt.fieldName)
+			if !tt.wantErr(t, err) || err != nil {
+				return
+			}
+
+			require.Equal(t, tt.want, got)
 		})
 	}
 }

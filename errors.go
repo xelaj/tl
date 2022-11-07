@@ -10,12 +10,18 @@ import (
 	"reflect"
 )
 
+type errorConst string
+
+func (e errorConst) Error() string { return string(e) } //cover:ignore
+
 const (
 	ErrUnexpectedNil = errorConst("unexpected nil value")
 	ErrImplicitInt   = errorConst("value must be converted to int32, int64 or uint32 explicitly")
 
 	ErrBitflagTooHigh   = errorConst("trigger bit is more than 32")
 	ErrImplicitNoTarget = errorConst(implicitFlag + " defined without target field to trigger")
+	ErrImplicitBitflag  = errorConst("'" + implicitFlag + "' and '" + isBitflagFlag + "' can't be combined")
+	ErrTagNameEmpty     = errorConst("tag name is empty")
 	ErrInvalidTagOption = errorConst("invalid option")
 	ErrInvalidTagFormat = errorConst("invalid tag format")
 )
@@ -25,7 +31,7 @@ type ErrRegisteredObjectNotFound struct {
 	Crc  uint32
 }
 
-func (e ErrRegisteredObjectNotFound) Error() string {
+func (e ErrRegisteredObjectNotFound) Error() string { //cover:ignore
 	return fmt.Sprintf("object with provided crc not registered: 0x%08x", e.Crc)
 }
 
@@ -34,37 +40,34 @@ type ErrorPartialWrite struct {
 	Want int
 }
 
-func (e ErrorPartialWrite) Error() string {
+func (e ErrorPartialWrite) Error() string { //cover:ignore
 	return fmt.Sprintf("write failed: writed only %v bytes, expected %v", e.Has, e.Want)
-}
-
-type ErrUnsupportedInt struct {
-	Kind reflect.Kind
-}
-
-func (e ErrUnsupportedInt) Error() string {
-	return fmt.Sprintf("int32, int64 or uint32 allowed, %v is unsupported by protocol", e.Kind)
-}
-
-type ErrUnsupportedFloat struct {
-	Kind reflect.Kind
-}
-
-func (e ErrUnsupportedFloat) Error() string {
-	return fmt.Sprintf("only float64 is allowed, %v is unsupported by protocol", e.Kind)
 }
 
 type ErrUnsupportedType struct {
 	Type reflect.Type
 }
 
-func (e ErrUnsupportedType) Error() string {
-	return fmt.Sprintf("invalid or unknown type %v", e.Type)
+func (e ErrUnsupportedType) Error() string { //cover:ignore
+	switch k := e.Type.Kind(); k {
+	// supported, but TL doesn't support 8 and 16 bit numbers
+	case reflect.Int, reflect.Int8, reflect.Int16,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint64:
+		return fmt.Sprintf("int32, int64 or uint32 allowed, %v is unsupported by protocol", k)
+
+	// same: supported, but not in TL, so we can't understand, how much bytes
+	// we need to scan.
+	case reflect.Float32, reflect.Complex64, reflect.Complex128:
+		return fmt.Sprintf("only float64 is allowed, %v is unsupported by protocol", k)
+
+	default:
+		return fmt.Sprintf("invalid or unknown type %v", e.Type)
+	}
 }
 
 type ErrObjectNotRegistered crc32
 
-func (e ErrObjectNotRegistered) Error() string {
+func (e ErrObjectNotRegistered) Error() string { //cover:ignore
 	return fmt.Sprintf("object with crc 0x%08x not registered", crc32(e))
 }
 
@@ -73,13 +76,13 @@ type ErrInvalidCRC struct {
 	Want crc32
 }
 
-func (e ErrInvalidCRC) Error() string {
+func (e ErrInvalidCRC) Error() string { //cover:ignore
 	return fmt.Sprintf("invalid crc code: got 0x%08x; want 0x%08x", e.Got, e.Want)
 }
 
 type ErrInvalidBoolCRC crc32
 
-func (e ErrInvalidBoolCRC) Error() string {
+func (e ErrInvalidBoolCRC) Error() string { //cover:ignore
 	return fmt.Sprintf(
 		"want a 0x%08x (true) or 0x%08x (false); got 0x%08x",
 		crcTrue,
@@ -92,18 +95,18 @@ type errReadCRC struct {
 	Wrapped error
 }
 
-func (e errReadCRC) Error() string { return "read crc: " + e.Wrapped.Error() }
-func (e errReadCRC) Unwrap() error { return e.Wrapped }
+func (e errReadCRC) Error() string { return "read crc: " + e.Wrapped.Error() } //cover:ignore
+func (e errReadCRC) Unwrap() error { return e.Wrapped }                        //cover:ignore
 
 type ErrPath struct {
 	Err  error
 	Path string
 }
 
-func (e ErrPath) Error() string { return e.Path + ": " + e.Err.Error() }
-func (e ErrPath) Unwrap() error { return e.Err }
+func (e ErrPath) Error() string { return e.Path + ": " + e.Err.Error() } //cover:ignore
+func (e ErrPath) Unwrap() error { return e.Err }                         //cover:ignore
 
-func wrapPath(err error, path string) error {
+func wrapPath(err error, path string) error { //cover:ignore
 	if err == nil {
 		return nil
 	}

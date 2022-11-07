@@ -21,6 +21,12 @@ import (
 )
 
 func tearup() {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Printf("TEARUP ERROR: %v", err)
+			os.Exit(2)
+		}
+	}()
 	RegisterObjects(
 		&MultipleChats{},
 		&Chat{},

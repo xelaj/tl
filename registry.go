@@ -18,11 +18,6 @@ type Registry interface {
 	ConstructObject(typ typeName, code crc32) (Object, structFields, bool)
 }
 
-type interfaceRemapper interface {
-	Registry
-	GetNameOfType(reflect.Type) string
-}
-
 // ObjectRegistry is a type, which handles code generated schema, and could be
 // useful for spawning TL objects. Unlike RawSchemaRegistry, it can work only
 // with predefined go types.
@@ -163,7 +158,7 @@ type structFields struct {
 	// key is an index of optional field in list of fields in object
 	// value is bit, which you need to trigger
 	bitflags map[int]bitflagBit
-	tags     []structTag
+	tags     []StructTag
 }
 
 func (s *structFields) isFieldOptional(fieldIndex int) bool {
@@ -193,7 +188,7 @@ func (r *ObjectRegistry) registerObject(o Object) {
 		typ = typ.Elem()
 	}
 	typData := structFields{
-		tags:     make([]structTag, typ.NumField()),
+		tags:     make([]StructTag, typ.NumField()),
 		bitflags: make(map[int]bitflagBit),
 	}
 

@@ -19,8 +19,8 @@ import (
 
 type null = struct{}
 
-func unreachable()   { panic("Unreachable") }   //nolint:deadcode // why not?
-func unimplemented() { panic("Unimplemented") } //nolint:deadcode // why not?
+func unreachable()   { panic("Unreachable") }
+func unimplemented() { panic("Unimplemented") }
 
 func randBytes(size int) []byte {
 	b := make([]byte, size)
@@ -37,6 +37,7 @@ func littleUint24Bytes(v int) []byte {
 	}
 }
 
+// pad returns size of padding for message.
 func pad(l, padSize int) int {
 	mod := l % padSize
 
@@ -67,7 +68,7 @@ func isFieldContainsData(v reflect.Value) bool {
 	}
 }
 
-func appendMany[T any](b ...[]T) []T {
+func appendMany[T any](b ...[]T) []T { //cover:ignore
 	var size int
 	for _, s := range b {
 		size += len(s)
@@ -81,7 +82,7 @@ func appendMany[T any](b ...[]T) []T {
 	return tmp
 }
 
-func as118[T error](err error) (T, bool) {
+func as118[T error](err error) (T, bool) { //cover:ignore
 	var converted T
 
 	return converted, errors.As(err, &converted)
@@ -91,36 +92,32 @@ type convertibleNum interface {
 	constraints.Integer | constraints.Float
 }
 
-func convertNumErr[V, T convertibleNum](res T, err error) (V, error) { return V(res), err }
+func convertNumErr[V, T convertibleNum](res T, err error) (V, error) { return V(res), err } //cover:ignore
 
 type convertibleStr interface {
 	~string | ~[]byte
 }
 
-func convertStrErr[V, T convertibleStr](res T, err error) (V, error) { return V(res), err }
+func convertStrErr[V, T convertibleStr](res T, err error) (V, error) { return V(res), err } //cover:ignore
 
-type errorConst string
+func ptr[T any](value T) *T { return &value } //cover:ignore
+func val[T any](value *T) T { return *value } //cover:ignore
 
-func (e errorConst) Error() string { return string(e) }
-
-func ptr[T any](value T) *T { return &value }
-func val[T any](value *T) T { return *value }
-
-func u32b(order binary.ByteOrder, v uint32) []byte {
+func u32b(order binary.ByteOrder, v uint32) []byte { //cover:ignore
 	b := make([]byte, WordLen)
 	order.PutUint32(b, v)
 
 	return b
 }
 
-func u64b(order binary.ByteOrder, v uint64) []byte {
+func u64b(order binary.ByteOrder, v uint64) []byte { //cover:ignore
 	b := make([]byte, LongLen)
 	order.PutUint64(b, v)
 
 	return b
 }
 
-func f64b(order binary.ByteOrder, v float64) []byte {
+func f64b(order binary.ByteOrder, v float64) []byte { //cover:ignore
 	b := make([]byte, LongLen)
 	order.PutUint64(b, math.Float64bits(v))
 
@@ -146,4 +143,19 @@ func bigIntBytes(v *big.Int, bitsize int) []byte {
 	}
 
 	return append(make([]byte, offset), vbytes...)
+}
+
+func maybeNil(v reflect.Value) bool {
+	switch v.Kind() { //nolint:exhaustive // has default statement
+	case reflect.Chan,
+		reflect.Func,
+		reflect.Map,
+		reflect.Pointer,
+		reflect.UnsafePointer,
+		reflect.Interface,
+		reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
 }

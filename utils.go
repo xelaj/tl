@@ -19,17 +19,17 @@ import (
 
 type null = struct{}
 
-func unreachable()   { panic("Unreachable") }
-func unimplemented() { panic("Unimplemented") }
+func unreachable()   { panic("Unreachable") }   //cover:ignore
+func unimplemented() { panic("Unimplemented") } //cover:ignore
 
-func randBytes(size int) []byte {
+func randBytes(size int) []byte { //cover:ignore
 	b := make([]byte, size)
 	rand.Read(b)
 
 	return b
 }
 
-func littleUint24Bytes(v int) []byte {
+func littleUint24Bytes(v int) []byte { //cover:ignore
 	return []byte{
 		byte(v),
 		byte(v >> 8),  //nolint:gomnd // r u kiddin

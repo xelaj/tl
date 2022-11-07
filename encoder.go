@@ -34,31 +34,36 @@ type MarshalState interface {
 	io.Writer
 }
 
-// Encoder is a type, which allows you to decode serialized message.
-type Encoder struct {
+type RealEncoder interface {
+	SetRegistry(registry *ObjectRegistry) RealEncoder
+	Encode(v any) error
+}
+
+// encoder is a type, which allows you to decode serialized message.
+type encoder struct {
 	w        io.Writer
 	registry *ObjectRegistry
 
 	endianess binary.ByteOrder
 }
 
-func NewEncoder(w io.Writer) *Encoder {
-	return &Encoder{w: w, registry: defaultRegistry, endianess: binary.LittleEndian}
+func NewEncoder(w io.Writer) RealEncoder {
+	return &encoder{w: w, registry: defaultRegistry, endianess: binary.LittleEndian}
 }
 
-func (e *Encoder) SetRegistry(registry *ObjectRegistry) *Encoder {
+func (e *encoder) SetRegistry(registry *ObjectRegistry) RealEncoder {
 	e.registry = registry
 
 	return e
 }
 
-func (e *Encoder) Encode(v any) error {
+func (e *encoder) Encode(v any) error {
 	return e.encodeValue(reflect.ValueOf(v))
 }
 
 // writeErr works like write (also throwing panic), but without count of
 // written bytes.
-func (e *Encoder) writeErr(b []byte) error {
+func (e *encoder) writeErr(b []byte) error {
 	if n, err := e.write(b); err != nil {
 		return err
 	} else if n != len(b) {
@@ -68,8 +73,16 @@ func (e *Encoder) writeErr(b []byte) error {
 	return nil
 }
 
+func (e *encoder) Write(b []byte) (int, error) {
+	if len(b)%WordLen != 0 {
+		return 0, errors.New("value can't be divided by word length")
+	}
+
+	return e.write(b)
+}
+
 // write is private, cause this function might panic.
-func (e *Encoder) write(b []byte) (int, error) {
+func (e *encoder) write(b []byte) (int, error) {
 	if len(b)%WordLen != 0 { //revive:disable-line:add-constant // makes no sense
 		// it's panic, because it's internal method, and we must not write in
 		// any case data, which is not divided by word length
@@ -85,7 +98,7 @@ func (e *Encoder) write(b []byte) (int, error) {
 
 //nolint:cyclop // it contains only assertion and switch statement
 //revive:disable:function-length // same: can't make better
-func (e *Encoder) encodeValue(value reflect.Value) error {
+func (e *encoder) encodeValue(value reflect.Value) error {
 	if maybeNil(value) {
 		return ErrUnexpectedNil
 	}
@@ -93,7 +106,7 @@ func (e *Encoder) encodeValue(value reflect.Value) error {
 	if marshaler, ok := value.Interface().(Marshaler); ok {
 		//nolint:wrapcheck // object implements Marshaler must throw unwrapped
 		//                    error
-		return marshaler.MarshalTL(e.provider())
+		return marshaler.MarshalTL(e)
 	}
 
 	switch k := value.Type().Kind(); k { //nolint:exhaustive // has default case
@@ -138,7 +151,7 @@ func (e *Encoder) encodeValue(value reflect.Value) error {
 //revive:enable
 
 // v must be pointer to struct.
-func (e *Encoder) encodeStruct(v reflect.Value) error {
+func (e *encoder) encodeStruct(v reflect.Value) error {
 	o, ok := v.Interface().(Object)
 	if !ok {
 		return errors.New(v.Type().String() + " doesn't implement tl.Object interface")
@@ -203,7 +216,7 @@ func (e *Encoder) encodeStruct(v reflect.Value) error {
 	return nil
 }
 
-func (e *Encoder) encodeMap(m reflect.Value) error {
+func (e *encoder) encodeMap(m reflect.Value) error {
 	if m.Type().Key().Kind() != reflect.String {
 		return errors.New("map keys are not string")
 	}
@@ -257,7 +270,7 @@ func (e *Encoder) encodeMap(m reflect.Value) error {
 
 // func (e *Encoder) collectBitflags()
 
-func (e *Encoder) encodeVector(slice reflect.Value) error {
+func (e *encoder) encodeVector(slice reflect.Value) error {
 	if b, ok := slice.Interface().([]byte); ok {
 		return e.putMessage(b)
 	}
@@ -280,15 +293,15 @@ func (e *Encoder) encodeVector(slice reflect.Value) error {
 	return nil
 }
 
-func (e *Encoder) putUint(v uint32) error    { return e.writeErr(u32b(e.endianess, v)) }
-func (e *Encoder) putLong(v int64) error     { return e.writeErr(u64b(e.endianess, uint64(v))) }
-func (e *Encoder) putDouble(v float64) error { return e.writeErr(f64b(e.endianess, v)) }
-func (e *Encoder) putCRC(v uint32) error     { return e.putUint(v) } // for selfdoc code
-func (e *Encoder) putInt(v int32) error      { return e.putUint(uint32(v)) }
-func (e *Encoder) putBool(v bool) error      { return e.putUint(boolToCRC(v)) }
-func (e *Encoder) putString(v string) error  { return e.putMessage([]byte(v)) }
+func (e *encoder) putUint(v uint32) error    { return e.writeErr(u32b(e.endianess, v)) }
+func (e *encoder) putLong(v int64) error     { return e.writeErr(u64b(e.endianess, uint64(v))) }
+func (e *encoder) putDouble(v float64) error { return e.writeErr(f64b(e.endianess, v)) }
+func (e *encoder) putCRC(v uint32) error     { return e.putUint(v) } // for selfdoc code
+func (e *encoder) putInt(v int32) error      { return e.putUint(uint32(v)) }
+func (e *encoder) putBool(v bool) error      { return e.putUint(boolToCRC(v)) }
+func (e *encoder) putString(v string) error  { return e.putMessage([]byte(v)) }
 
-func (e *Encoder) putMessage(msg []byte) error {
+func (e *encoder) putMessage(msg []byte) error {
 	// 3 left bytes of word, which is 4 bytes
 	const maxLen = 1 << ((WordLen - 1) * bitsInByte)
 	if len(msg) > maxLen {
@@ -322,22 +335,6 @@ func (e *Encoder) putMessage(msg []byte) error {
 		msg,
 		make([]byte, pad(len(lenBytes)+len(msg), WordLen)),
 	))
-}
-
-func (e *Encoder) provider() MarshalState { return ptr(marshaler(*e)) }
-
-type marshaler Encoder
-
-var _ MarshalState = (*marshaler)(nil)
-
-func (m *marshaler) e() *Encoder { return (*Encoder)(m) }
-
-func (m *marshaler) Write(b []byte) (int, error) {
-	if len(b)%WordLen != 0 {
-		return 0, errors.New("value can't be divided by word length")
-	}
-
-	return m.e().write(b)
 }
 
 // m only map.

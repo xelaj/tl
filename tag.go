@@ -114,7 +114,7 @@ type Bitflag struct {
 	BitPosition uint8
 }
 
-func (t *Bitflag) String() string {  //cover:ignore
+func (t *Bitflag) String() string { //cover:ignore
 	return strings.Join([]string{
 		omitemptyPrefix, t.TargetField, strconv.Itoa(int(t.BitPosition)),
 	}, ":")

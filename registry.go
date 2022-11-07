@@ -18,11 +18,6 @@ type Registry interface {
 	ConstructObject(typ typeName, code crc32) (Object, structFields, bool)
 }
 
-type interfaceRemapper interface {
-	Registry
-	GetNameOfType(reflect.Type) string
-}
-
 // ObjectRegistry is a type, which handles code generated schema, and could be
 // useful for spawning TL objects. Unlike RawSchemaRegistry, it can work only
 // with predefined go types.

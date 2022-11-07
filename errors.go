@@ -44,28 +44,25 @@ func (e ErrorPartialWrite) Error() string { //cover:ignore
 	return fmt.Sprintf("write failed: writed only %v bytes, expected %v", e.Has, e.Want)
 }
 
-type ErrUnsupportedInt struct {
-	Kind reflect.Kind
-}
-
-func (e ErrUnsupportedInt) Error() string { //cover:ignore
-	return fmt.Sprintf("int32, int64 or uint32 allowed, %v is unsupported by protocol", e.Kind)
-}
-
-type ErrUnsupportedFloat struct {
-	Kind reflect.Kind
-}
-
-func (e ErrUnsupportedFloat) Error() string { //cover:ignore
-	return fmt.Sprintf("only float64 is allowed, %v is unsupported by protocol", e.Kind)
-}
-
 type ErrUnsupportedType struct {
 	Type reflect.Type
 }
 
 func (e ErrUnsupportedType) Error() string { //cover:ignore
-	return fmt.Sprintf("invalid or unknown type %v", e.Type)
+	switch k := e.Type.Kind(); k {
+	// supported, but TL doesn't support 8 and 16 bit numbers
+	case reflect.Int, reflect.Int8, reflect.Int16,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint64:
+		return fmt.Sprintf("int32, int64 or uint32 allowed, %v is unsupported by protocol", k)
+
+	// same: supported, but not in TL, so we can't understand, how much bytes
+	// we need to scan.
+	case reflect.Float32, reflect.Complex64, reflect.Complex128:
+		return fmt.Sprintf("only float64 is allowed, %v is unsupported by protocol", k)
+
+	default:
+		return fmt.Sprintf("invalid or unknown type %v", e.Type)
+	}
 }
 
 type ErrObjectNotRegistered crc32

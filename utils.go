@@ -19,8 +19,8 @@ import (
 
 type null = struct{}
 
-func unreachable()   { panic("Unreachable") }   //nolint:deadcode // why not?
-func unimplemented() { panic("Unimplemented") } //nolint:deadcode // why not?
+func unreachable()   { panic("Unreachable") }
+func unimplemented() { panic("Unimplemented") }
 
 func randBytes(size int) []byte {
 	b := make([]byte, size)
@@ -37,6 +37,7 @@ func littleUint24Bytes(v int) []byte {
 	}
 }
 
+// pad returns size of padding for message.
 func pad(l, padSize int) int {
 	mod := l % padSize
 
@@ -142,4 +143,19 @@ func bigIntBytes(v *big.Int, bitsize int) []byte {
 	}
 
 	return append(make([]byte, offset), vbytes...)
+}
+
+func maybeNil(v reflect.Value) bool {
+	switch v.Kind() { //nolint:exhaustive // has default statement
+	case reflect.Chan,
+		reflect.Func,
+		reflect.Map,
+		reflect.Pointer,
+		reflect.UnsafePointer,
+		reflect.Interface,
+		reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
 }

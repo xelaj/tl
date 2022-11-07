@@ -22,12 +22,8 @@ func Unmarshal(b []byte, res any) error {
 	return NewDecoder(bytes.NewBuffer(b)).Decode(res)
 }
 
-func UnmarshalUnknown(b []byte) (any, error) {
-	return NewDecoder(bytes.NewBuffer(b)).DecodeUnknown()
-}
-
-type RealDecoder interface {
-	SetRegistry(registry Registry) Decoder
+type Decoder interface {
+	SetRegistry(registry *ObjectRegistry) Decoder
 
 	Decode(res any) error
 }
@@ -35,22 +31,23 @@ type RealDecoder interface {
 type UnmarshalState interface {
 	// ReadWords reads words from unmarshaler with fixed size of word.
 	io.Reader
+	Peek(seek, size int) ([]byte, error)
+	SkipBytes(int)
 
 	PopBool() (bool, error)
 	PopCRC() (crc32, error)
 }
 
-// A Decoder reads and decodes TL values from an input stream.
-type Decoder struct { //nolint:govet // false positive for fieldalignment
-	r           bufio.Reader
-	peekedBytes int
+// A decoder reads and decodes TL values from an input stream.
+type decoder struct { //nolint:govet // false positive for fieldalignment
+	r bufio.Reader
 
 	registry  *ObjectRegistry
 	endianess binary.ByteOrder
 }
 
 // NewDecoder returns a new decoder that reads from r.
-func NewDecoder(r io.Reader) *Decoder { return NewDecoderWithSize(r, 0) }
+func NewDecoder(r io.Reader) Decoder { return NewDecoderWithSize(r, 0) }
 
 // NewDecoderWithSize works absolutely like NewDecoder, but it sets buffer with
 // size that you want. It could be useful, when you want to debug serialized
@@ -62,7 +59,7 @@ func NewDecoder(r io.Reader) *Decoder { return NewDecoderWithSize(r, 0) }
 // serialized message. pass this length and few more bytes (50-60 bytes will be
 // enough). Note that DumpWithoutRead can't guarantee to be stable, so use it
 // only for debugging.
-func NewDecoderWithSize(r io.Reader, bufSize int) *Decoder {
+func NewDecoderWithSize(r io.Reader, bufSize int) Decoder {
 	// bufio doesn't export this constant, so, we must set it manually
 	const bufioDefaultBufSize = 4096
 
@@ -70,20 +67,20 @@ func NewDecoderWithSize(r io.Reader, bufSize int) *Decoder {
 		bufSize = bufioDefaultBufSize
 	}
 
-	return &Decoder{
+	return &decoder{
 		r:         *bufio.NewReaderSize(r, bufSize),
 		registry:  defaultRegistry,
 		endianess: binary.LittleEndian,
 	}
 }
 
-func (d *Decoder) SetRegistry(registry *ObjectRegistry) *Decoder {
+func (d *decoder) SetRegistry(registry *ObjectRegistry) Decoder {
 	d.registry = registry
 
 	return d
 }
 
-func (d *Decoder) Decode(res any) error {
+func (d *decoder) Decode(res any) error {
 	if res == nil {
 		return ErrUnexpectedNil
 	}
@@ -99,8 +96,8 @@ func (d *Decoder) Decode(res any) error {
 }
 
 // DecodeUnknown works like Decode, but it tries to get object stored in data stream.
-func (d *Decoder) DecodeUnknown() (any, error) {
-	crc, err := d.popCRC()
+func (d *decoder) DecodeUnknown() (any, error) {
+	crc, err := d.PopCRC()
 	if err != nil {
 		return nil, errReadCRC{err}
 	}
@@ -143,48 +140,38 @@ func (d *Decoder) DecodeUnknown() (any, error) {
 	return object.Interface(), nil
 }
 
-func (d *Decoder) GetRestOfMessage() ([]byte, error) {
-	d.success()
-
-	return io.ReadAll(&d.r) //nolint:wrapcheck // must not be wrapped
-}
-
-func (d *Decoder) peekPadding(msgSize int) (err error) {
+func (d *decoder) peekPadding(seek, msgSize int) (err error) {
 	if p := pad(msgSize, WordLen); p > 0 {
-		_, err = d.peek(p)
+		_, err = d.Peek(seek, p)
 	}
 
 	return err
 }
 
-func (d *Decoder) peek(size int) ([]byte, error) {
-	peeked, err := d.r.Peek(d.peekedBytes + size)
+func (d *decoder) Peek(seek, size int) ([]byte, error) {
+	peeked, err := d.r.Peek(seek + size)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // must not be wrapped
 	}
-	seek := d.peekedBytes
-	d.peekedBytes += size
 
 	return peeked[seek:], nil
 }
 
-func (d *Decoder) success() {
+func (d *decoder) SkipBytes(n int) {
 	// discarded will be only exact number or less, BUT with returned error
-	_, err := d.r.Discard(d.peekedBytes)
-	if err != nil {
+	if _, err := d.r.Discard(n); err != nil {
 		panic(errors.Wrap(err, "something wrong with peeking bytes, Discard must always be ok"))
 	}
-	d.peekedBytes = 0
 }
 
-func (d *Decoder) decodeValue(value reflect.Value) error {
+func (d *decoder) decodeValue(value reflect.Value) error {
 	if unmarshaler, ok := value.Interface().(Unmarshaler); ok {
-		return unmarshaler.UnmarshalTL(d.provider()) //nolint:wrapcheck // makes no sense
+		return unmarshaler.UnmarshalTL(d) //nolint:wrapcheck // makes no sense
 	}
 
 	// extra case
 	if value.Type().Implements(enumTyp) {
-		crc, err := d.popCRC()
+		crc, err := d.PopCRC()
 		if err != nil {
 			return err
 		}
@@ -195,23 +182,7 @@ func (d *Decoder) decodeValue(value reflect.Value) error {
 	var val any
 	var err error
 
-	switch kind := value.Kind(); kind { //nolint:exhaustive // only invalid? rly?
-	// unsupported
-	case reflect.Chan, reflect.Func, reflect.Uintptr, reflect.UnsafePointer:
-		return ErrUnsupportedType{Type: value.Type()}
-
-	// supported, but TL doesn't support 8 and 16 bit numbers
-	case reflect.Int, reflect.Int8, reflect.Int16,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint64:
-		// as discussed in encoder: we can't be sure that we decode 4 bytes
-		// or 8, or even 16. so throwing an error
-		return ErrUnsupportedInt{Kind: kind}
-
-	// same: supported, but not in TL, so we can't understand, how much bytes
-	// we need to scan.
-	case reflect.Float32, reflect.Complex64, reflect.Complex128:
-		return ErrUnsupportedFloat{Kind: kind}
-
+	switch kind := value.Kind(); kind { //nolint:exhaustive
 	// pointer always diving into value
 	case reflect.Ptr:
 		// need to init firstly
@@ -229,13 +200,13 @@ func (d *Decoder) decodeValue(value reflect.Value) error {
 		val, err = d.popLong()
 
 	case reflect.Uint32:
-		val, err = d.popUint()
+		val, err = d.PopUint()
 
 	case reflect.Int32:
 		val, err = d.popInt()
 
 	case reflect.Bool:
-		val, err = d.popBool()
+		val, err = d.PopBool()
 
 	case reflect.String:
 		val, err = d.popString()
@@ -267,7 +238,16 @@ func (d *Decoder) decodeValue(value reflect.Value) error {
 		return d.decodeInterface(value)
 
 	default:
-		panic("unknown thingie: " + value.Type().String())
+		// unsupported at all
+		// Chan, Func, Uintptr, UnsafePointer
+		//
+		// supported, but TL doesn't support 8 and 16 bit numbers
+		// Int, Int8, Int16, Uint, Uint8, Uint16, Uint64
+		//
+		// same: supported, but not in TL, so we can't understand, how much bytes
+		// we need to scan.
+		// Float32, Complex64, Complex128
+		return ErrUnsupportedType{Type: value.Type()}
 	}
 
 	if err != nil {
@@ -280,9 +260,9 @@ func (d *Decoder) decodeValue(value reflect.Value) error {
 }
 
 // allowed values are only slice and array.
-func (d *Decoder) decodeVector(v reflect.Value, ignoreCRC bool) error {
+func (d *decoder) decodeVector(v reflect.Value, ignoreCRC bool) error {
 	if !ignoreCRC {
-		crc, err := d.popCRC()
+		crc, err := d.PopCRC()
 		if err != nil {
 			return errReadCRC{err}
 		}
@@ -292,7 +272,7 @@ func (d *Decoder) decodeVector(v reflect.Value, ignoreCRC bool) error {
 		}
 	}
 
-	size, err := d.popUint()
+	size, err := d.PopUint()
 	if err != nil {
 		return errors.Wrap(err, "read vector size")
 	}
@@ -318,8 +298,8 @@ func (d *Decoder) decodeVector(v reflect.Value, ignoreCRC bool) error {
 	return nil
 }
 
-func (d *Decoder) decodeInterface(v reflect.Value) error {
-	crc, err := d.popCRC()
+func (d *decoder) decodeInterface(v reflect.Value) error {
+	crc, err := d.PopCRC()
 	if err != nil {
 		return errReadCRC{err}
 	}
@@ -338,7 +318,7 @@ func (d *Decoder) decodeInterface(v reflect.Value) error {
 	return nil
 }
 
-func (d *Decoder) decodeEnum(v reflect.Value, crc crc32) error {
+func (d *decoder) decodeEnum(v reflect.Value, crc crc32) error {
 	enum, ok := d.registry.enums[crc]
 	if !ok {
 		return fmt.Errorf("enum 0x%08x not found", crc)
@@ -354,7 +334,7 @@ func (d *Decoder) decodeEnum(v reflect.Value, crc crc32) error {
 }
 
 // decode EXACT object. means that v must always be struct.
-func (d *Decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
+func (d *decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
 	if v.Kind() == reflect.Interface && ignoreCRC {
 		return errors.New("can't decode value to interface without reading crc code")
 	}
@@ -370,7 +350,7 @@ func (d *Decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
 	}
 
 	if !ignoreCRC {
-		gotCrc, err := d.popCRC()
+		gotCrc, err := d.PopCRC()
 		if err != nil {
 			return errReadCRC{err}
 		}
@@ -393,7 +373,7 @@ func (d *Decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
 			continue
 		}
 		if tags.IsBitflag {
-			bits, err := d.popUint()
+			bits, err := d.PopUint()
 			if err != nil {
 				return errors.Wrapf(err, "getting %v flag", tags.Name)
 			}
@@ -432,45 +412,45 @@ func (d *Decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
 	return nil
 }
 
-func (d *Decoder) popInt() (int32, error) {
-	val, err := d.peek(WordLen)
+func (d *decoder) popInt() (int32, error) {
+	val, err := d.Peek(0, WordLen)
 	if err != nil {
 		return 0, err
 	}
 
-	d.success()
+	d.SkipBytes(WordLen)
 
 	return int32(binary.LittleEndian.Uint32(val)), nil
 }
 
-func (d *Decoder) popLong() (int64, error) {
-	val, err := d.peek(LongLen)
+func (d *decoder) popLong() (int64, error) {
+	val, err := d.Peek(0, LongLen)
 	if err != nil {
 		return 0, err
 	}
 
-	d.success()
+	d.SkipBytes(LongLen)
 
 	return int64(binary.LittleEndian.Uint64(val)), nil
 }
 
 // popRequiredCRC reding crc from input, and compares with expected crc code.
-func (d *Decoder) popRequiredCRC(expected crc32) error {
+func (d *decoder) popRequiredCRC(expected crc32) error {
 	return nil
 }
 
 // popCRC just an alias for self documenting code.
-func (d *Decoder) popCRC() (crc32, error)   { return d.popUint() }
-func (d *Decoder) popUint() (uint32, error) { return convertNumErr[uint32](d.popInt()) }
+func (d *decoder) PopCRC() (crc32, error)   { return d.PopUint() }
+func (d *decoder) PopUint() (uint32, error) { return convertNumErr[uint32](d.popInt()) }
 
-func (d *Decoder) popDouble() (float64, error) {
+func (d *decoder) popDouble() (float64, error) {
 	val, err := d.popLong()
 
 	return math.Float64frombits(uint64(val)), err
 }
 
-func (d *Decoder) popBool() (bool, error) {
-	crc, err := d.popUint()
+func (d *decoder) PopBool() (bool, error) {
+	crc, err := d.PopUint()
 	if err != nil {
 		return false, err
 	}
@@ -485,10 +465,10 @@ func (d *Decoder) popBool() (bool, error) {
 	}
 }
 
-func (d *Decoder) popString() (string, error) { return convertStrErr[string](d.popMessage()) }
-func (d *Decoder) popMessage() ([]byte, error) {
+func (d *decoder) popString() (string, error) { return convertStrErr[string](d.popMessage()) }
+func (d *decoder) popMessage() ([]byte, error) {
 	readLen := 1
-	buf, err := d.peek(1)
+	buf, err := d.Peek(0, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -501,8 +481,8 @@ func (d *Decoder) popMessage() ([]byte, error) {
 		realSize = int(firstByte)
 	} else {
 		// otherwise it's a large message, next three bytes are size of message
-		readLen += WordLen - 1
-		lenBuf, errPeek := d.peek(WordLen - 1)
+		readLen = WordLen
+		lenBuf, errPeek := d.Peek(1, WordLen-1)
 		if errPeek != nil {
 			return nil, errors.Wrapf(errPeek, "reading last %v bytes of message size", WordLen-1)
 		}
@@ -520,44 +500,28 @@ func (d *Decoder) popMessage() ([]byte, error) {
 	}
 
 	// this buf wil be real message
-	buf, err = d.peek(realSize)
+	buf, err = d.Peek(readLen, realSize)
 	if err != nil {
 		return nil, errors.Wrapf(err, "reading message data with len of %v", realSize)
 	}
-
-	if err := d.peekPadding(readLen + realSize); err != nil {
-		return nil, errors.Wrapf(err, "reading void bytes")
-	}
-
-	d.success()
+	d.SkipBytes(readLen + realSize + pad(readLen+realSize, WordLen))
 
 	return buf, nil
 }
 
-func (d *Decoder) provider() UnmarshalState { return ptr(unmarshaler(*d)) }
-
-type unmarshaler Decoder
-
-var _ UnmarshalState = (*unmarshaler)(nil)
-
-func (m *unmarshaler) d() *Decoder { return (*Decoder)(m) }
-
-func (m *unmarshaler) Read(b []byte) (int, error) {
+func (d *decoder) Read(b []byte) (int, error) {
 	if len(b)%WordLen != 0 {
 		return 0, errors.New("value can't be divided by word length")
 	}
 
-	read, err := m.d().peek(len(b))
+	read, err := d.Peek(0, len(b))
 	if err != nil {
 		return 0, err
 	}
-	m.d().success()
+	d.SkipBytes(len(b))
 
 	return copy(b, read), nil
 }
-
-func (m *unmarshaler) PopBool() (bool, error) { return m.d().popBool() }
-func (m *unmarshaler) PopCRC() (crc32, error) { return m.d().popCRC() }
 
 /*
 	crcV := v.MapIndex(reflect.ValueOf(MapCrcKey))

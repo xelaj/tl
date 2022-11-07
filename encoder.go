@@ -83,7 +83,7 @@ func (e *Encoder) write(b []byte) (int, error) {
 	return e.w.Write(b) //nolint:wrapcheck // write() is a wrapper
 }
 
-//nolint:gocyclo,cyclop // it contains only assertion and switch statement
+//nolint:cyclop // it contains only assertion and switch statement
 //revive:disable:function-length // same: can't make better
 func (e *Encoder) encodeValue(value reflect.Value) error {
 	if maybeNil(value) {
@@ -129,12 +129,6 @@ func (e *Encoder) encodeValue(value reflect.Value) error {
 
 	case reflect.Int, reflect.Uint:
 		return ErrImplicitInt
-
-	case reflect.Int8, reflect.Int16, reflect.Uint8, reflect.Uint16, reflect.Uint64:
-		return ErrUnsupportedInt{Kind: k}
-
-	case reflect.Float32, reflect.Complex64, reflect.Complex128:
-		return ErrUnsupportedFloat{Kind: k}
 
 	default:
 		return ErrUnsupportedType{Type: value.Type()}
@@ -357,19 +351,4 @@ func getCRCFromMap(m reflect.Value) (uint32, error) {
 	}
 
 	return uint32(crcVal.Convert(uint32Typ).Uint()), nil
-}
-
-func maybeNil(v reflect.Value) bool {
-	switch v.Kind() { //nolint:exhaustive // has default statement
-	case reflect.Chan,
-		reflect.Func,
-		reflect.Map,
-		reflect.Pointer,
-		reflect.UnsafePointer,
-		reflect.Interface,
-		reflect.Slice:
-		return v.IsNil()
-	default:
-		return false
-	}
 }

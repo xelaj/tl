@@ -368,24 +368,24 @@ func TestParseTag(t *testing.T) {
 		name      string
 		tag       string
 		fieldName string
-		want      *StructTag
+		want      StructTag
 		wantErr   assert.ErrorAssertionFunc
 	}{{
 		tag:       "",
 		fieldName: "SomeField",
-		want: &StructTag{
+		want: StructTag{
 			Name: "SomeField",
 		},
 	}, {
 		tag:       "some_field",
 		fieldName: "SomeField",
-		want: &StructTag{
+		want: StructTag{
 			Name: "some_field",
 		},
 	}, {
 		tag:       ",omitempty:bitflag:30",
 		fieldName: "SomeField",
-		want: &StructTag{
+		want: StructTag{
 			Name: "SomeField",
 			BitFlags: &Bitflag{
 				TargetField: "bitflag",
@@ -395,7 +395,7 @@ func TestParseTag(t *testing.T) {
 	}, {
 		tag:       ",omitempty:bitflag:30,implicit",
 		fieldName: "SomeField",
-		want: &StructTag{
+		want: StructTag{
 			Name: "SomeField",
 			BitFlags: &Bitflag{
 				TargetField: "bitflag",
@@ -422,7 +422,7 @@ func TestParseTag(t *testing.T) {
 	}, {
 		tag:       ",bitflag",
 		fieldName: "SomeField",
-		want: &StructTag{
+		want: StructTag{
 			Name:      "SomeField",
 			IsBitflag: true,
 		},
@@ -441,7 +441,7 @@ func TestParseTag(t *testing.T) {
 	}, {
 		tag:       ",omitempty:global_bitflags:0,bitflag",
 		fieldName: "subflags",
-		want: &StructTag{
+		want: StructTag{
 			Name: "subflags",
 			BitFlags: &Bitflag{
 				TargetField: "global_bitflags",

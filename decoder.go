@@ -95,59 +95,6 @@ func (d *decoder) Decode(res any) error {
 	return d.decodeValue(v.Elem())
 }
 
-// DecodeUnknown works like Decode, but it tries to get object stored in data stream.
-func (d *decoder) DecodeUnknown() (any, error) {
-	crc, err := d.PopCRC()
-	if err != nil {
-		return nil, errReadCRC{err}
-	}
-
-	switch crc {
-	case crcVector:
-		// TODO: last time problem was exact in this case, we couldn't parse
-		//       unknown vector from telegram responses. So, we added cache for
-		//       types "prediction", which parser used before. If we can't
-		//       understand which type written, we can't parse **any** received
-		//       message from server.
-		//
-		//       it's really important problem for typelang: dynamic messages
-		//       are not so dynamic as telegram devs tell to you.
-		// hashtag for quick search in code: #explanation_of_vector_problem
-		return nil, errors.New("got vector, not allowed to decode it manually")
-	case crcFalse:
-		return false, nil
-	case crcTrue:
-		return true, nil
-	case crcNull:
-		return nil, nil
-	}
-
-	enum, ok := d.registry.enums[crc]
-	if ok {
-		return enum, nil
-	}
-
-	object, err := d.registry.spawnObject(crc)
-	if err != nil {
-		return nil, err
-	}
-
-	err = d.decodeObject(object, true)
-	if err != nil {
-		return nil, err
-	}
-
-	return object.Interface(), nil
-}
-
-func (d *decoder) peekPadding(seek, msgSize int) (err error) {
-	if p := pad(msgSize, WordLen); p > 0 {
-		_, err = d.Peek(seek, p)
-	}
-
-	return err
-}
-
 func (d *decoder) Peek(seek, size int) ([]byte, error) {
 	peeked, err := d.r.Peek(seek + size)
 	if err != nil {
@@ -165,12 +112,10 @@ func (d *decoder) SkipBytes(n int) {
 }
 
 func (d *decoder) decodeValue(value reflect.Value) error {
-	if unmarshaler, ok := value.Interface().(Unmarshaler); ok {
-		return unmarshaler.UnmarshalTL(d) //nolint:wrapcheck // makes no sense
-	}
-
-	// extra case
-	if value.Type().Implements(enumTyp) {
+	switch v := value.Interface().(type) {
+	case Unmarshaler:
+		return v.UnmarshalTL(d)
+	case Enum:
 		crc, err := d.PopCRC()
 		if err != nil {
 			return err

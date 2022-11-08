@@ -6,6 +6,8 @@
 package tl
 
 import (
+	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -41,16 +43,14 @@ type StructTag struct {
 //
 //	// value is abcd, it's required to exist in serialized
 //	`tl:"abcd"`
-func ParseTag(tag, defaultName string) (t *StructTag, err error) {
+func ParseTag(tag, defaultName string) (t StructTag, err error) {
 	parts := strings.Split(tag, ",")
 	name := parts[0]
 	if name == "" {
 		name = defaultName
 	}
 
-	t = &StructTag{
-		Name: name,
-	}
+	t.Name = name
 	for _, option := range parts[1:] {
 		switch {
 		case option == implicitFlag:
@@ -61,18 +61,80 @@ func ParseTag(tag, defaultName string) (t *StructTag, err error) {
 
 		case strings.HasPrefix(option, omitemptyPrefix):
 			if t.BitFlags, err = parseOmitemptyTag(option); err != nil {
-				return nil, err
+				return StructTag{}, err
 			}
 
 		default:
-			return nil, errors.Wrap(ErrInvalidTagOption, option)
+			return StructTag{}, errors.Wrap(ErrInvalidTagOption, option)
 		}
 	}
 	if err := t.valid(); err != nil {
-		return nil, err
+		return StructTag{}, err
 	}
 
 	return t, nil
+}
+
+func ParseStructTags(s any) ([]StructTag, map[int]bitflagBit, error) {
+	t := indirectType(reflect.TypeOf(s))
+	if t.Kind() != reflect.Struct {
+		return nil, nil, errors.New("value is not a struct")
+	}
+
+	return parseStructTags(t)
+}
+
+func parseStructTags(t reflect.Type) ([]StructTag, map[int]bitflagBit, error) {
+	tags := make([]StructTag, t.NumField())
+	optional := map[int]bitflagBit{}
+	tagNamesIndexes := make(map[string]int, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		ft := t.Field(i)
+		typName := t.Name() + "." + ft.Name
+
+		var err error
+		if tags[i], err = ParseTag(ft.Tag.Get(tagName), ft.Name); err != nil {
+			return nil, nil, errors.Wrapf(err, "parsing tag of %v", typName)
+		}
+		tagNamesIndexes[tags[i].Name] = i
+
+		bitflags := tags[i].BitFlags
+		if bitflags == nil {
+			continue
+		}
+
+		targetField, ok := tagNamesIndexes[bitflags.TargetField]
+		if !ok {
+			return nil, nil, fmt.Errorf("tag %v as bitflag not found in struct", tags[i].BitFlags.TargetField)
+		}
+
+		switch ft.Type.Kind() { //nolint:exhaustive // passes 4 kinds, otherwise panics
+		case reflect.Ptr, reflect.Interface, reflect.Slice:
+		case reflect.Bool:
+			if tags[i].Implicit {
+				break
+			}
+
+			fallthrough
+		default:
+			panic(fmt.Sprintf("%v: field tagged as omitempty, but kind is not pointer to "+
+				"value or bool", typName))
+		}
+
+		optional[i] = bitflagBit{
+			fieldIndex: targetField,
+			bitIndex:   int(bitflags.BitPosition),
+		}
+	}
+
+	return tags, optional, nil
+}
+
+func indirectType(t reflect.Type) reflect.Type { //cover:ignore
+	if t.Kind() != reflect.Pointer {
+		return t
+	}
+	return t.Elem()
 }
 
 func (t *StructTag) Ignore() bool { return t.Name == "-" } //cover:ignore

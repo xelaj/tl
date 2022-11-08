@@ -231,7 +231,7 @@ func (r *ObjectRegistry) registerObject(o Object) {
 			}
 		}
 
-		typData.tags[i] = *tag
+		typData.tags[i] = tag
 	}
 
 	if r.structFields == nil {

@@ -159,13 +159,13 @@ func (e *encoder) encodeStruct(v reflect.Value) error {
 
 	v = reflect.Indirect(v)
 
-	properties, ok := e.registry.structFields[o.CRC()]
-	if !ok {
-		return errors.New(v.Type().String() + " is not registered type")
+	properties, bitflags, err := parseStructTags(v.Type())
+	if err != nil {
+		return errors.Wrap(err, "parsing struct flags")
 	}
 
 	optFlags := make(map[int]crc32)
-	for i, target := range properties.bitflags {
+	for i, target := range bitflags {
 		// even if we don't have any non null optional values, we still need to initialize bitflags
 		if _, ok := optFlags[target.fieldIndex]; !ok {
 			optFlags[target.fieldIndex] = 0
@@ -178,7 +178,7 @@ func (e *encoder) encodeStruct(v reflect.Value) error {
 	// what we checked and what we know about value:
 	// 1) it's not Marshaler (marshaler method if exist used already in c.encodeValue())
 	// 2) implements tl.Object
-	// 3) definitely struct (we don't call encodeStruct(), only in c.encodeValue())
+	// 3) definitely struct (we don't call encodeStruct() but in c.encodeValue())
 	// 4) not nil (structs can't be nil, only pointers and interfaces)
 	if err := e.putCRC(o.CRC()); err != nil {
 		return err
@@ -194,16 +194,13 @@ func (e *encoder) encodeStruct(v reflect.Value) error {
 			continue
 		}
 
-		tag := properties.tags[i]
+		tag := properties[i]
+		_, fieldOptional := bitflags[i]
 
 		// if ignore or field is unexported, then go on
 		if tag.Ignore() ||
 			!v.Field(i).CanSet() ||
-			(properties.isFieldOptional(i) && !isFieldContainsData(v.Field(i))) {
-			continue
-		}
-
-		if _, ok := properties.bitflags[i]; ok && tag.Implicit {
+			(fieldOptional && (!isFieldContainsData(v.Field(i)) || tag.Implicit)) {
 			continue
 		}
 

@@ -67,29 +67,6 @@ func (r *ObjectRegistry) spawnObject(crc crc32) (reflect.Value, error) {
 	return v, nil
 }
 
-/*
-func (r *ObjectRegistry) ConstructObject(typ typeName, code crc32) (Object, *structFields, bool) {
-	// special case, when we absolutely don't know what's the type of our object
-	if typ == "" {
-		for _, c := range r.constructors {
-			_ = c
-			//if obj := c(code); obj != nil {
-			//	return obj,
-			//}
-		}
-	}
-
-	constructor, ok := r.constructors[typ]
-	if !ok {
-		return nil, nil, false
-	}
-	if obj := constructor(code); obj != nil {
-		return obj, nil, true
-	}
-	return nil, nil, false
-}
-*/
-
 // orphanType is a type definition, which doesn't have any struct type to it.
 type orphanType struct {
 	implements string
@@ -105,7 +82,7 @@ func (o *orphanType) collectBitflags(m reflect.Value) (map[uint8]crc32, error) {
 	f := map[uint8]crc32{}
 
 	for i, field := range o.fields {
-		if _, ok := field.fType.(fieldBitflag); ok {
+		if _, ok := field.fType.(fieldBool); ok {
 			f[uint8(i)] = 0
 
 			continue
@@ -131,22 +108,6 @@ type field struct {
 	noEncode    bool // don't encode value, if value is true. works ONLY for boolean types
 	optional    bool
 }
-
-type fieldType interface {
-	_isFieldType()
-}
-
-type fieldBitflag null
-
-func (fieldBitflag) _isFieldType() {}
-
-type fieldObject crc32
-
-func (fieldObject) _isFieldType() {}
-
-type fieldInterface string
-
-func (fieldInterface) _isFieldType() {}
 
 //nolint:gochecknoglobals // obvious reason to do that.
 var defaultRegistry = &ObjectRegistry{}
@@ -262,16 +223,3 @@ func (r *ObjectRegistry) registerEnum(enum Enum) {
 	}
 	r.enumNames[enum.CRC()] = enum.String()
 }
-
-type tlType uint8
-
-const (
-	typeBool tlType = iota
-	typeInt
-	typeLong
-	typeDouble
-	typeString
-	typeVector
-	typeObject
-	typeInterface
-)

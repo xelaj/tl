@@ -30,6 +30,7 @@ type StructTag struct {
 	Implicit  bool
 	Name      string
 	IsBitflag bool
+	Type      fieldType
 }
 
 // ParseTag is a function which parses struct field tag for structes, defined by
@@ -96,6 +97,10 @@ func parseStructTags(t reflect.Type) ([]StructTag, map[int]bitflagBit, error) {
 		if tags[i], err = ParseTag(ft.Tag.Get(tagName), ft.Name); err != nil {
 			return nil, nil, errors.Wrapf(err, "parsing tag of %v", typName)
 		}
+		if tags[i].Type = getFieldTypeFromGoType(ft.Type); tags[i].Type == nil {
+			return nil, nil, errors.Wrapf(ErrUnsupportedType{Type: ft.Type}, "parsing tag of %v", typName)
+		}
+
 		tagNamesIndexes[tags[i].Name] = i
 
 		bitflags := tags[i].BitFlags
@@ -214,3 +219,95 @@ func parseUintMax32(s string) (uint8, error) {
 
 	return 0, ErrInvalidTagFormat
 }
+
+func getFieldTypeFromGoType(t reflect.Type) fieldType {
+	switch t.Kind() {
+	case reflect.Ptr:
+		return getFieldTypeFromGoType(t.Elem())
+
+	case reflect.Uint32, reflect.Int32:
+		return fieldInt{}
+
+	case reflect.Int64:
+		return fieldLong{}
+
+	case reflect.Float64:
+		return fieldDouble{}
+
+	case reflect.Bool:
+		return fieldBool{}
+
+	case reflect.String:
+		return fieldString{}
+
+	case reflect.Struct:
+		if crcGetter, ok := reflect.New(t).Interface().(Object); ok {
+			return fieldObject(crcGetter.CRC())
+		}
+
+		// we can't support other types but Object.
+		return nil
+
+	case reflect.Interface:
+		if t.Implements(objectTyp) {
+			return fieldInterface{Type: t}
+		}
+
+		return nil
+
+	case reflect.Map:
+		return fieldInterface{Type: objectTyp} // any object we have
+
+	case reflect.Slice:
+		if inner := getFieldTypeFromGoType(t.Elem()); inner != nil {
+			return fieldVector{Inner: inner}
+		}
+
+		return nil
+
+	default:
+		return nil
+	}
+}
+
+type fieldType interface{ _fieldType() }
+
+type fieldBool null
+
+func (fieldBool) _fieldType() {}
+
+type fieldInt null
+
+func (fieldInt) _fieldType() {}
+
+type fieldLong null
+
+func (fieldLong) _fieldType() {}
+
+type fieldDouble null
+
+func (fieldDouble) _fieldType() {}
+
+type fieldBytes null
+
+func (fieldBytes) _fieldType() {}
+
+type fieldString null
+
+func (fieldString) _fieldType() {}
+
+type fieldVector struct {
+	Inner fieldType
+}
+
+func (fieldVector) _fieldType() {}
+
+type fieldObject crc32
+
+func (fieldObject) _fieldType() {}
+
+type fieldInterface struct {
+	Type reflect.Type
+}
+
+func (fieldInterface) _fieldType() {}

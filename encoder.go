@@ -67,7 +67,7 @@ func (e *encoder) writeErr(b []byte) error {
 	if n, err := e.write(b); err != nil {
 		return err
 	} else if n != len(b) {
-		return &ErrorPartialWrite{Has: n, Want: len(b)}
+		return &ErrPartialWrite{Has: n, Want: len(b)}
 	}
 
 	return nil
@@ -139,9 +139,6 @@ func (e *encoder) encodeValue(value reflect.Value) error {
 
 	case reflect.Slice:
 		return e.encodeVector(value)
-
-	case reflect.Int, reflect.Uint:
-		return ErrImplicitInt
 
 	default:
 		return ErrUnsupportedType{Type: value.Type()}

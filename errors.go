@@ -35,12 +35,12 @@ func (e ErrRegisteredObjectNotFound) Error() string { //cover:ignore
 	return fmt.Sprintf("object with provided crc not registered: 0x%08x", e.Crc)
 }
 
-type ErrorPartialWrite struct {
+type ErrPartialWrite struct {
 	Has  int
 	Want int
 }
 
-func (e ErrorPartialWrite) Error() string { //cover:ignore
+func (e ErrPartialWrite) Error() string { //cover:ignore
 	return fmt.Sprintf("write failed: writed only %v bytes, expected %v", e.Has, e.Want)
 }
 

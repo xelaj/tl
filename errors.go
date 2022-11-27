@@ -24,6 +24,7 @@ const (
 	ErrTagNameEmpty     = errorConst("tag name is empty")
 	ErrInvalidTagOption = errorConst("invalid option")
 	ErrInvalidTagFormat = errorConst("invalid tag format")
+	ErrTypeIsEmpty      = errorConst("tl field type is empty")
 )
 
 type ErrRegisteredObjectNotFound struct {

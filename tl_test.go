@@ -401,7 +401,7 @@ func TestParseTag(t *testing.T) {
 				TargetField: "bitflag",
 				BitPosition: 30,
 			},
-			Implicit: true,
+			Type: ImplicitBoolType,
 		},
 	}, {
 		tag:       ",omitempty:otherflag",
@@ -424,7 +424,7 @@ func TestParseTag(t *testing.T) {
 		fieldName: "SomeField",
 		want: StructTag{
 			Name:      "SomeField",
-			IsBitflag: true,
+			Type: BitflagType,
 		},
 	}, {
 		tag:       "some_field,abracadabre",
@@ -447,7 +447,7 @@ func TestParseTag(t *testing.T) {
 				TargetField: "global_bitflags",
 				BitPosition: 0,
 			},
-			IsBitflag: true,
+			Type: BitflagType,
 		},
 	}} {
 		tt := tt // for parallel tests

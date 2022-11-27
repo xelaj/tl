@@ -35,23 +35,23 @@ type MarshalState interface {
 }
 
 type RealEncoder interface {
-	SetRegistry(registry *ObjectRegistry) RealEncoder
+	SetRegistry(registry Registry) RealEncoder
 	Encode(v any) error
 }
 
 // encoder is a type, which allows you to decode serialized message.
 type encoder struct {
 	w        io.Writer
-	registry *ObjectRegistry
+	registry Registry
 
 	endianess binary.ByteOrder
 }
 
 func NewEncoder(w io.Writer) RealEncoder {
-	return &encoder{w: w, registry: defaultRegistry, endianess: binary.LittleEndian}
+	return &encoder{w: w, registry: nil, endianess: binary.LittleEndian}
 }
 
-func (e *encoder) SetRegistry(registry *ObjectRegistry) RealEncoder {
+func (e *encoder) SetRegistry(registry Registry) RealEncoder {
 	e.registry = registry
 
 	return e
@@ -134,8 +134,8 @@ func (e *encoder) encodeValue(value reflect.Value) error {
 	case reflect.Ptr, reflect.Interface:
 		return e.encodeValue(value.Elem())
 
-	case reflect.Map:
-		return e.encodeMap(value)
+	//case reflect.Map:
+	//	return e.encodeMap(value)
 
 	case reflect.Slice:
 		return e.encodeVector(value)
@@ -197,7 +197,7 @@ func (e *encoder) encodeStruct(v reflect.Value) error {
 		// if ignore or field is unexported, then go on
 		if tag.Ignore() ||
 			!v.Field(i).CanSet() ||
-			(fieldOptional && (!isFieldContainsData(v.Field(i)) || tag.Implicit)) {
+			(fieldOptional && (!isFieldContainsData(v.Field(i)) || tag.isImplicit())) {
 			continue
 		}
 
@@ -210,6 +210,7 @@ func (e *encoder) encodeStruct(v reflect.Value) error {
 	return nil
 }
 
+/*
 func (e *encoder) encodeMap(m reflect.Value) error {
 	if m.Type().Key().Kind() != reflect.String {
 		return errors.New("map keys are not string")
@@ -220,7 +221,7 @@ func (e *encoder) encodeMap(m reflect.Value) error {
 		return err
 	}
 
-	definition, ok := e.registry.orphans[crc]
+	definition, ok := e.registry.Tags(crc)
 	if !ok {
 		//nolint:goerr113 // it's an internal error
 		return fmt.Errorf("crc code %08x is not found in registry", crc)
@@ -261,8 +262,7 @@ func (e *encoder) encodeMap(m reflect.Value) error {
 
 	return nil
 }
-
-// func (e *Encoder) collectBitflags()
+*/
 
 func (e *encoder) encodeVector(slice reflect.Value) error {
 	if b, ok := slice.Interface().([]byte); ok {

@@ -26,11 +26,9 @@ const (
 )
 
 type StructTag struct {
-	BitFlags  *Bitflag
-	Implicit  bool
-	Name      string
-	IsBitflag bool
-	Type      fieldType
+	BitFlags *Bitflag
+	Name     string
+	Type     fieldType
 }
 
 // ParseTag is a function which parses struct field tag for structes, defined by
@@ -44,7 +42,12 @@ type StructTag struct {
 //
 //	// value is abcd, it's required to exist in serialized
 //	`tl:"abcd"`
-func ParseTag(tag, defaultName string) (t StructTag, err error) {
+func ParseTag(tag, defaultName string) (StructTag, error) {
+	return parseTag(tag, defaultName, nil)
+}
+
+// ft is optional, you can add related type later
+func parseTag(tag, defaultName string, ft reflect.Type) (t StructTag, err error) {
 	parts := strings.Split(tag, ",")
 	name := parts[0]
 	if name == "" {
@@ -55,10 +58,16 @@ func ParseTag(tag, defaultName string) (t StructTag, err error) {
 	for _, option := range parts[1:] {
 		switch {
 		case option == implicitFlag:
-			t.Implicit = true
+			if t.Type != nil {
+				return StructTag{}, ErrImplicitBitflag
+			}
+			t.Type = fieldImplicitBool{}
 
 		case option == isBitflagFlag:
-			t.IsBitflag = true
+			if t.Type != nil {
+				return StructTag{}, ErrImplicitBitflag
+			}
+			t.Type = fieldBitflags{}
 
 		case strings.HasPrefix(option, omitemptyPrefix):
 			if t.BitFlags, err = parseOmitemptyTag(option); err != nil {
@@ -69,6 +78,12 @@ func ParseTag(tag, defaultName string) (t StructTag, err error) {
 			return StructTag{}, errors.Wrap(ErrInvalidTagOption, option)
 		}
 	}
+	if t.Type == nil && ft != nil {
+		if t.Type = GetFieldTypeFromGoType(ft); t.Type == nil {
+			return StructTag{}, ErrUnsupportedType{Type: ft}
+		}
+	}
+
 	if err := t.valid(); err != nil {
 		return StructTag{}, err
 	}
@@ -97,9 +112,6 @@ func parseStructTags(t reflect.Type) ([]StructTag, map[int]bitflagBit, error) {
 		if tags[i], err = ParseTag(ft.Tag.Get(tagName), ft.Name); err != nil {
 			return nil, nil, errors.Wrapf(err, "parsing tag of %v", typName)
 		}
-		if tags[i].Type = getFieldTypeFromGoType(ft.Type); tags[i].Type == nil {
-			return nil, nil, errors.Wrapf(ErrUnsupportedType{Type: ft.Type}, "parsing tag of %v", typName)
-		}
 
 		tagNamesIndexes[tags[i].Name] = i
 
@@ -116,7 +128,7 @@ func parseStructTags(t reflect.Type) ([]StructTag, map[int]bitflagBit, error) {
 		switch ft.Type.Kind() { //nolint:exhaustive // passes 4 kinds, otherwise panics
 		case reflect.Ptr, reflect.Interface, reflect.Slice:
 		case reflect.Bool:
-			if tags[i].Implicit {
+			if _, ok := tags[i].Type.(fieldImplicitBool); ok {
 				break
 			}
 
@@ -142,38 +154,44 @@ func indirectType(t reflect.Type) reflect.Type { //cover:ignore
 	return t.Elem()
 }
 
-func (t *StructTag) Ignore() bool { return t.Name == "-" } //cover:ignore
+func (t StructTag) Ignore() bool { return t.Name == "-" } //cover:ignore
 
-func (t *StructTag) String() string { //cover:ignore
+func (t StructTag) String() string { //cover:ignore
 	res := t.Name
 	if t.BitFlags != nil {
 		res += "," + t.BitFlags.String()
 	}
-	if t.Implicit {
+	switch t.Type.(type) {
+	case fieldImplicitBool:
 		res += "," + implicitFlag
-	}
-	if t.IsBitflag {
+	case fieldBitflags:
 		res += "," + isBitflagFlag
 	}
 
 	return res
 }
 
-func (t *StructTag) valid() error {
+func (t StructTag) valid() error {
 	switch {
-	case t == nil:
-		return nil
 	case t.Name == "":
 		return ErrTagNameEmpty
-	case t.Implicit && (t.BitFlags == nil || t.BitFlags.TargetField == ""):
+	case t.isImplicit() && (t.BitFlags == nil || t.BitFlags.TargetField == ""):
 		return ErrImplicitNoTarget
-	case t.Implicit && t.IsBitflag:
-		return ErrImplicitBitflag
 	case t.BitFlags != nil && t.BitFlags.BitPosition > maxBitflagIndex:
 		return ErrBitflagTooHigh
 	default:
 		return nil
 	}
+}
+
+func (t StructTag) isImplicit() bool {
+	_, ok := t.Type.(fieldImplicitBool)
+	return ok
+}
+
+func (t StructTag) isBitflag() bool {
+	_, ok := t.Type.(fieldBitflags)
+	return ok
 }
 
 type Bitflag struct {
@@ -220,10 +238,14 @@ func parseUintMax32(s string) (uint8, error) {
 	return 0, ErrInvalidTagFormat
 }
 
-func getFieldTypeFromGoType(t reflect.Type) fieldType {
+func GetFieldTypeFromGoType(t reflect.Type) fieldType {
+	if t.Implements(unmarshalerTyp) {
+		return fieldCustom{}
+	}
+
 	switch t.Kind() {
 	case reflect.Ptr:
-		return getFieldTypeFromGoType(t.Elem())
+		return GetFieldTypeFromGoType(t.Elem())
 
 	case reflect.Uint32, reflect.Int32:
 		return fieldInt{}
@@ -259,7 +281,7 @@ func getFieldTypeFromGoType(t reflect.Type) fieldType {
 		return fieldInterface{Type: objectTyp} // any object we have
 
 	case reflect.Slice:
-		if inner := getFieldTypeFromGoType(t.Elem()); inner != nil {
+		if inner := GetFieldTypeFromGoType(t.Elem()); inner != nil {
 			return fieldVector{Inner: inner}
 		}
 
@@ -272,9 +294,22 @@ func getFieldTypeFromGoType(t reflect.Type) fieldType {
 
 type fieldType interface{ _fieldType() }
 
+var (
+	BitflagType      = fieldBitflags{}
+	ImplicitBoolType = fieldImplicitBool{}
+)
+
+type fieldBitflags null
+
+func (fieldBitflags) _fieldType() {}
+
 type fieldBool null
 
 func (fieldBool) _fieldType() {}
+
+type fieldImplicitBool null
+
+func (fieldImplicitBool) _fieldType() {}
 
 type fieldInt null
 
@@ -287,6 +322,14 @@ func (fieldLong) _fieldType() {}
 type fieldDouble null
 
 func (fieldDouble) _fieldType() {}
+
+type fieldInt128 null
+
+func (fieldInt128) _fieldType() {}
+
+type fieldInt256 null
+
+func (fieldInt256) _fieldType() {}
 
 type fieldBytes null
 
@@ -311,3 +354,9 @@ type fieldInterface struct {
 }
 
 func (fieldInterface) _fieldType() {}
+
+type fieldCustom struct {
+	Type reflect.Type
+}
+
+func (fieldCustom) _fieldType() {}

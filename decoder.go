@@ -317,7 +317,7 @@ func (d *decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
 		if tags.Ignore() {
 			continue
 		}
-		if tags.IsBitflag {
+		if tags.isBitflag() {
 			bits, err := d.PopUint()
 			if err != nil {
 				return errors.Wrapf(err, "getting %v flag", tags.Name)
@@ -336,7 +336,7 @@ func (d *decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
 			}
 			bitflagValue := f&(1<<tags.BitFlags.BitPosition) > 0
 
-			if tags.Implicit {
+			if tags.isImplicit() {
 				// implicit can be only boolean, so leave this initialization alone
 				v.Field(i).Set(reflect.ValueOf(bitflagValue))
 

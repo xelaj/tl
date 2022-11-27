@@ -16,6 +16,7 @@ type typeName = string
 
 type Registry interface {
 	ConstructObject(typ typeName, code crc32) (Object, structFields, bool)
+	Tags(code crc32) ([]StructTag, bool)
 }
 
 // ObjectRegistry is a type, which handles code generated schema, and could be
@@ -33,8 +34,6 @@ type ObjectRegistry struct {
 	// without arguments). It's guaranteed that we know enum type, so no need to
 	enums     map[crc32]Enum
 	enumNames enumNames
-
-	orphans map[crc32]orphanType
 }
 
 func (r *ObjectRegistry) pushObject(crc crc32, typ reflect.Type) {
@@ -65,39 +64,6 @@ func (r *ObjectRegistry) spawnObject(crc crc32) (reflect.Value, error) {
 	}
 
 	return v, nil
-}
-
-// orphanType is a type definition, which doesn't have any struct type to it.
-type orphanType struct {
-	implements string
-	fields     []field
-}
-
-// collectBitflags collects bitflags from map.
-func (o *orphanType) collectBitflags(m reflect.Value) (map[uint8]crc32, error) {
-	if m.Kind() != reflect.Map {
-		panic("provided non map value to method")
-	}
-
-	f := map[uint8]crc32{}
-
-	for i, field := range o.fields {
-		if _, ok := field.fType.(fieldBool); ok {
-			f[uint8(i)] = 0
-
-			continue
-		}
-
-		ok := m.MapIndex(reflect.ValueOf(field.name)).IsValid()
-		if field.optional && (ok || field.noEncode) {
-			f[field.flagTrigger] |= crc32(1 << field.bitTrigger)
-		} else if !field.optional && !ok {
-			//nolint:goerr113 // it's an internal error
-			return nil, fmt.Errorf("field %q is required for this type", field.name)
-		}
-	}
-
-	return f, nil
 }
 
 type field struct {
@@ -187,7 +153,7 @@ func (r *ObjectRegistry) registerObject(o Object) {
 				bitIndex:   int(tag.BitFlags.BitPosition),
 			}
 
-			if tag.Implicit && fTyp.Type.Kind() != reflect.Bool {
+			if tag.isImplicit() && fTyp.Type.Kind() != reflect.Bool {
 				panic(fmt.Sprintf("%v: %q tag works only for bool fields", typName, implicitFlag))
 			}
 		}

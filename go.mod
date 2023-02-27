@@ -7,7 +7,7 @@ require (
 	github.com/dave/jennifer v1.6.0
 	github.com/gabriel-vasile/mimetype v1.4.0
 	github.com/pkg/errors v0.9.1
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/urfave/cli/v2 v2.23.0
 	golang.org/x/exp v0.0.0-20220428152302-39d4317da171
 	golang.org/x/text v0.3.7

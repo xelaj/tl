@@ -8,14 +8,14 @@ package tl
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
 	"reflect"
 	"strconv"
-
-	"github.com/pkg/errors"
 )
 
 func Unmarshal(b []byte, res any) error {
@@ -23,7 +23,7 @@ func Unmarshal(b []byte, res any) error {
 }
 
 type Decoder interface {
-	SetRegistry(registry *ObjectRegistry) Decoder
+	SetRegistry(registry Registry) Decoder
 
 	Decode(res any) error
 }
@@ -31,18 +31,22 @@ type Decoder interface {
 type UnmarshalState interface {
 	// ReadWords reads words from unmarshaler with fixed size of word.
 	io.Reader
+	ReadAll() ([]byte, error)
 	Peek(seek, size int) ([]byte, error)
 	SkipBytes(int)
 
 	PopBool() (bool, error)
+	PopInt() (int32, error)
+	PopLong() (int64, error)
 	PopCRC() (crc32, error)
+	PopMessage() ([]byte, error)
 }
 
 // A decoder reads and decodes TL values from an input stream.
 type decoder struct { //nolint:govet // false positive for fieldalignment
 	r bufio.Reader
 
-	registry  *ObjectRegistry
+	registry  Registry
 	endianess binary.ByteOrder
 }
 
@@ -69,12 +73,12 @@ func NewDecoderWithSize(r io.Reader, bufSize int) Decoder {
 
 	return &decoder{
 		r:         *bufio.NewReaderSize(r, bufSize),
-		registry:  defaultRegistry,
+		registry:  DefaultRegistry(),
 		endianess: binary.LittleEndian,
 	}
 }
 
-func (d *decoder) SetRegistry(registry *ObjectRegistry) Decoder {
+func (d *decoder) SetRegistry(registry Registry) Decoder {
 	d.registry = registry
 
 	return d
@@ -89,7 +93,6 @@ func (d *decoder) Decode(res any) error {
 	if v.Kind() != reflect.Ptr {
 		return fmt.Errorf("res value is not pointer as expected. got %v", v.Type())
 	}
-
 	// decoding elem cause we are taking pointer in res, but we'll take
 	// additional step to call decodeValue again. Who needs that?
 	return d.decodeValue(v.Elem())
@@ -101,27 +104,25 @@ func (d *decoder) Peek(seek, size int) ([]byte, error) {
 		return nil, err //nolint:wrapcheck // must not be wrapped
 	}
 
-	return peeked[seek:], nil
+	res := make([]byte, size)
+	if l := copy(res, peeked[seek:]); l != len(res) {
+		// just for test, who knows
+		panic(fmt.Sprintf("copying bytes: expected %v, got %v", size, l))
+	}
+
+	return res, nil
 }
 
 func (d *decoder) SkipBytes(n int) {
 	// discarded will be only exact number or less, BUT with returned error
 	if _, err := d.r.Discard(n); err != nil {
-		panic(errors.Wrap(err, "something wrong with peeking bytes, Discard must always be ok"))
+		panic(fmt.Errorf("something wrong with peeking bytes, Discard must always be ok: %w", err))
 	}
 }
 
 func (d *decoder) decodeValue(value reflect.Value) error {
-	switch v := value.Interface().(type) {
-	case Unmarshaler:
+	if v, ok := value.Interface().(Unmarshaler); ok {
 		return v.UnmarshalTL(d)
-	case Enum:
-		crc, err := d.PopCRC()
-		if err != nil {
-			return err
-		}
-
-		return d.decodeEnum(value, crc)
 	}
 
 	var val any
@@ -142,13 +143,22 @@ func (d *decoder) decodeValue(value reflect.Value) error {
 		val, err = d.popDouble()
 
 	case reflect.Int64:
-		val, err = d.popLong()
+		val, err = d.PopLong()
 
 	case reflect.Uint32:
+		if _, ok := value.Interface().(Object); ok {
+			crc, err := d.PopCRC()
+			if err != nil {
+				return err
+			}
+
+			return d.decodeEnum(value, crc)
+		}
+
 		val, err = d.PopUint()
 
 	case reflect.Int32:
-		val, err = d.popInt()
+		val, err = d.PopInt()
 
 	case reflect.Bool:
 		val, err = d.PopBool()
@@ -159,7 +169,7 @@ func (d *decoder) decodeValue(value reflect.Value) error {
 	case reflect.Slice:
 		switch value.Type() {
 		case byteSliceTyp: // []byte
-			val, err = d.popMessage()
+			val, err = d.PopMessage()
 
 		default:
 			return d.decodeVector(value, false)
@@ -180,7 +190,10 @@ func (d *decoder) decodeValue(value reflect.Value) error {
 
 	// interfaces in terms of TL is a set of allowed structs.
 	case reflect.Interface:
-		return d.decodeInterface(value)
+		if err := d.decodeInterface(value); err != nil {
+			return fmt.Errorf("decoding interface: %w", err)
+		}
+		return nil
 
 	default:
 		// unsupported at all
@@ -199,7 +212,8 @@ func (d *decoder) decodeValue(value reflect.Value) error {
 		return err
 	}
 
-	value.Set(reflect.ValueOf(val))
+	v := reflect.ValueOf(&val).Elem().Elem()
+	value.Set(v)
 
 	return nil
 }
@@ -219,7 +233,7 @@ func (d *decoder) decodeVector(v reflect.Value, ignoreCRC bool) error {
 
 	size, err := d.PopUint()
 	if err != nil {
-		return errors.Wrap(err, "read vector size")
+		return fmt.Errorf("read vector size: %w", err)
 	}
 
 	switch v.Kind() { //nolint:exhaustive // default unreachable
@@ -249,28 +263,98 @@ func (d *decoder) decodeInterface(v reflect.Value) error {
 		return errReadCRC{err}
 	}
 
-	o, err := d.registry.spawnObject(crc)
-	if err != nil {
-		return err
+	if crc == crcGzipPacked {
+		// ! special case for gzip packed objects
+		//
+		// serialized data MIGHT place gzipped objects (and only vectors and
+		// objects!) in a random places, where it looks like the message is "too
+		// big". To handle that, here we unzipping it, and replacing original
+		// reader with custom one.
+		//
+		// Important: according to (https://core.telegram.org/api/invoking, it's
+		// "recommended" to zip large messages from client side, but telegram
+		// is... Telegram, so it might argue sometimes. But in any case, it
+		// makes no sense to implement mtproto extension of "classic" tl
+		// serialization as required component)
+		gz, err := d.popZip(true)
+		if err != nil {
+			return err
+		}
+
+		// replacing reader with custom, which will read from gzip reader.
+		old := d.r
+		defer func() { d.r = old }()
+		d.r = *bufio.NewReader(gz)
+
+		crc, err = d.PopCRC()
+		if err != nil {
+			return errReadCRC{err}
+		}
+	}
+
+	obj, ok := d.registry.ConstructObject(crc)
+	if !ok {
+		return ErrObjectNotRegistered(crc)
+	}
+	o := reflect.ValueOf(&obj).Elem()
+
+	if o.Kind() != reflect.Interface {
+		panic("unexpected object which is not interface")
+	}
+	if !o.Elem().IsValid() {
+		panic("constructor must return non empty interface")
+	}
+
+	if o.Elem().Kind() == reflect.Ptr && o.Elem().IsNil() {
+		realType := o.Elem().Type().Elem()
+		o.Set(reflect.New(realType))
+	}
+
+	if unmarshaler, ok := o.Interface().(Unmarshaler); ok {
+		if err := unmarshaler.UnmarshalTL(d); err != nil {
+			return err
+		}
+		v.Set(o)
+
+		return nil
+	}
+
+	o = o.Elem().Elem()
+
+	if o.Kind() != reflect.Struct {
+		return fmt.Errorf("object must be struct, got %v", o.Type())
 	}
 
 	err = d.decodeObject(o, true)
 	if err != nil {
 		return err // no need to wrap
 	}
+
+	// set value of o into v with interface conversion
+	vtyp := reflect.New(v.Type()).Elem()
+
+	if !o.Type().Implements(vtyp.Type()) {
+		if !o.Addr().Type().Implements(vtyp.Type()) {
+			panic("can't find interface implementation")
+		}
+		o = o.Addr()
+	}
+
 	v.Set(o)
 
 	return nil
 }
 
 func (d *decoder) decodeEnum(v reflect.Value, crc crc32) error {
-	enum, ok := d.registry.enums[crc]
+	enum, ok := d.registry.ConstructObject(crc)
 	if !ok {
 		return fmt.Errorf("enum 0x%08x not found", crc)
 	}
 	value := reflect.ValueOf(enum)
 	if v.Type() != value.Type() {
 		return fmt.Errorf("invalid type of enum: want %v, got %v", v.Type(), value.Type())
+	} else if value.Kind() != reflect.Uint32 {
+		panic("internal error: enum must not have fields")
 	}
 
 	v.Set(value)
@@ -280,18 +364,13 @@ func (d *decoder) decodeEnum(v reflect.Value, crc crc32) error {
 
 // decode EXACT object. means that v must always be struct.
 func (d *decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
-	if v.Kind() == reflect.Interface && ignoreCRC {
-		return errors.New("can't decode value to interface without reading crc code")
+	if v.Kind() != reflect.Struct {
+		panic(fmt.Errorf("expected struct, got %v with %v kind", v.Type(), v.Kind()))
 	}
 
 	crc, ok := getCRCofObject(v)
 	if !ok {
 		return errors.New("value must implement Object interface, got: " + v.Type().String())
-	}
-
-	fields, ok := d.registry.structFields[crc]
-	if !ok {
-		return fmt.Errorf("object 0x%08x is not registered", crc)
 	}
 
 	if !ignoreCRC {
@@ -305,30 +384,29 @@ func (d *decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
 		}
 	}
 
-	v = reflect.Indirect(v)
-	if v.Kind() != reflect.Struct {
-		return fmt.Errorf("expected struct, got %v with %v kind", v.Type(), v.Kind())
-	}
-
-	bitflags := map[int]uint32{}
-
+	bitflags := map[string]uint32{}
 	for i := 0; i < v.NumField(); i++ {
-		tags := fields.tags[i]
+		typ := v.Type().Field(i)
+		tags, err := ParseTag(typ.Tag.Get(tagName), typ.Name)
+		if err != nil {
+			panic(fmt.Sprintf("invalid tag: %v", err))
+		}
+
 		if tags.Ignore() {
 			continue
 		}
 		if tags.isBitflag() {
 			bits, err := d.PopUint()
 			if err != nil {
-				return errors.Wrapf(err, "getting %v flag", tags.Name)
+				return fmt.Errorf("getting %v flag: %w", tags.Name, err)
 			}
-			bitflags[i] = bits
+			bitflags[tags.Name] = bits
 
 			continue
 		}
 		needToDecode := true
 		if tags.BitFlags != nil {
-			f, ok := bitflags[fields.bitflags[i].fieldIndex]
+			f, ok := bitflags[tags.BitFlags.TargetField]
 			if !ok {
 				panic("internal error: " +
 					"struct is not validated on register stage: " +
@@ -348,8 +426,12 @@ func (d *decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
 
 		if needToDecode {
 			// normal field
+			if v.Field(i).Kind() == reflect.Ptr {
+				v.Field(i).Set(reflect.New(v.Field(i).Type().Elem()))
+			}
+
 			if err := d.decodeValue(v.Field(i)); err != nil {
-				return wrapPath(err, tags.Name)
+				return wrapPath(err, v.Type().Field(i).Name)
 			}
 		}
 	}
@@ -357,7 +439,7 @@ func (d *decoder) decodeObject(v reflect.Value, ignoreCRC bool) error {
 	return nil
 }
 
-func (d *decoder) popInt() (int32, error) {
+func (d *decoder) PopInt() (int32, error) {
 	val, err := d.Peek(0, WordLen)
 	if err != nil {
 		return 0, err
@@ -368,7 +450,7 @@ func (d *decoder) popInt() (int32, error) {
 	return int32(binary.LittleEndian.Uint32(val)), nil
 }
 
-func (d *decoder) popLong() (int64, error) {
+func (d *decoder) PopLong() (int64, error) {
 	val, err := d.Peek(0, LongLen)
 	if err != nil {
 		return 0, err
@@ -379,17 +461,12 @@ func (d *decoder) popLong() (int64, error) {
 	return int64(binary.LittleEndian.Uint64(val)), nil
 }
 
-// popRequiredCRC reding crc from input, and compares with expected crc code.
-func (d *decoder) popRequiredCRC(expected crc32) error {
-	return nil
-}
-
 // popCRC just an alias for self documenting code.
 func (d *decoder) PopCRC() (crc32, error)   { return d.PopUint() }
-func (d *decoder) PopUint() (uint32, error) { return convertNumErr[uint32](d.popInt()) }
+func (d *decoder) PopUint() (uint32, error) { return convertNumErr[uint32](d.PopInt()) }
 
 func (d *decoder) popDouble() (float64, error) {
-	val, err := d.popLong()
+	val, err := d.PopLong()
 
 	return math.Float64frombits(uint64(val)), err
 }
@@ -410,8 +487,10 @@ func (d *decoder) PopBool() (bool, error) {
 	}
 }
 
-func (d *decoder) popString() (string, error) { return convertStrErr[string](d.popMessage()) }
-func (d *decoder) popMessage() ([]byte, error) {
+
+// https://core.telegram.org/type/bytes
+func (d *decoder) popString() (string, error) { return convertStrErr[string](d.PopMessage()) }
+func (d *decoder) PopMessage() ([]byte, error) {
 	readLen := 1
 	buf, err := d.Peek(0, 1)
 	if err != nil {
@@ -429,7 +508,7 @@ func (d *decoder) popMessage() ([]byte, error) {
 		readLen = WordLen
 		lenBuf, errPeek := d.Peek(1, WordLen-1)
 		if errPeek != nil {
-			return nil, errors.Wrapf(errPeek, "reading last %v bytes of message size", WordLen-1)
+			return nil, fmt.Errorf("reading last %v bytes of message size: %w", WordLen-1, errPeek)
 		}
 
 		switch d.endianess {
@@ -447,11 +526,43 @@ func (d *decoder) popMessage() ([]byte, error) {
 	// this buf wil be real message
 	buf, err = d.Peek(readLen, realSize)
 	if err != nil {
-		return nil, errors.Wrapf(err, "reading message data with len of %v", realSize)
+		return nil, fmt.Errorf("reading message data with len of %v: %w", realSize, err)
 	}
 	d.SkipBytes(readLen + realSize + pad(readLen+realSize, WordLen))
 
 	return buf, nil
+}
+
+// ! special case for gzip packed objects
+//
+// serialized data MIGHT have replacements from original objects to gzipped
+// objects (and only vectors and objects!) in a random places, where it looks
+// like the message is "too big". To handle that, here we unzipping it, and
+// replacing original reader with custom one.
+//
+// Important: according to https://core.telegram.org/api/invoking, it's
+// "recommended" to zip large messages from client side, but telegram
+// is... Telegram, so it might argue sometimes. But in any case, it
+// makes no sense to implement mtproto extension of "classic" tl
+// serialization as required component)
+func (d *decoder) popZip(ignoreCRC bool) (io.ReadCloser, error) {
+	if !ignoreCRC {
+		gotCrc, err := d.PopCRC()
+		if err != nil {
+			return nil, errReadCRC{err}
+		}
+
+		if gotCrc != crcGzipPacked {
+			return nil, ErrInvalidCRC{Got: gotCrc, Want: crcGzipPacked}
+		}
+	}
+
+	data, err := d.PopMessage()
+	if err != nil {
+		return nil, fmt.Errorf("reading gzip value: %w", err)
+	}
+
+	return gzip.NewReader(bytes.NewBuffer(data))
 }
 
 func (d *decoder) Read(b []byte) (int, error) {
@@ -467,6 +578,8 @@ func (d *decoder) Read(b []byte) (int, error) {
 
 	return copy(b, read), nil
 }
+
+func (d *decoder) ReadAll() ([]byte, error) { return io.ReadAll(&d.r) }
 
 /*
 	crcV := v.MapIndex(reflect.ValueOf(MapCrcKey))

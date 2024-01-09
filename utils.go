@@ -47,8 +47,8 @@ func pad(l, padSize int) int {
 // v is bool, pointer, interface or slice.
 func isFieldContainsData(v reflect.Value) bool {
 	// special cases for enums
-	if v, ok := v.Interface().(Enum); ok {
-		return v.CRC() != 0
+	if enum, ok := v.Interface().(Object); ok && v.Kind() == reflect.Uint32 {
+		return enum != nil && enum.CRC() != 0
 	}
 
 	switch k := v.Kind(); k { //nolint:exhaustive // have default
@@ -100,8 +100,9 @@ type convertibleStr interface {
 
 func convertStrErr[V, T convertibleStr](res T, err error) (V, error) { return V(res), err } //cover:ignore
 
-func ptr[T any](value T) *T { return &value } //cover:ignore
-func val[T any](value *T) T { return *value } //cover:ignore
+func ptr[T any](value T) *T { return &value }     //cover:ignore
+func val[T any](value *T) T { return *value }     //cover:ignore
+func new[T any]() T         { var t T; return t } //cover:ignore
 
 func u32b(order binary.ByteOrder, v uint32) []byte { //cover:ignore
 	b := make([]byte, WordLen)

@@ -27,47 +27,68 @@ func TestParseFile(t *testing.T) {
 	}{{
 		file: "internal/testdata/simplest.tl",
 		expected: &Schema{
-			Objects: []*Object{{
-				Name:   "someEnum",
-				CRC:    0x5508ec75,
-				Fields: []Parameter{},
-				Type:   TypeCommon("CoolEnumerate"),
-			}, Method(&Object{
-				Name:   "someFunc",
-				CRC:    0x7da07ec9,
-				Fields: []Parameter{},
-				Type:   TypeCommon("CoolEnumerate"),
-			})},
-			TypeComments: map[string]string{},
+			TypeOrder: []ObjName{{Name: "CoolEnumerate"}},
+			Objects:   map[ObjName]TypeObjects{},
+			Enums: map[ObjName]EnumObjects{
+				{Name: "CoolEnumerate"}: {
+					Objects: []Object{{
+
+						Name:   ObjName{Name: "someEnum"},
+						CRC:    0x5508ec75,
+						Fields: []Parameter{},
+						Type:   TypeCommon(ObjName{Name: "CoolEnumerate"}),
+					}},
+				},
+			},
+			MethodGroupOrder: []string{"", "auth"},
+			MethodsGroups: map[string][]Object{
+				"": {{
+					Name:   ObjName{Name: "someFunc"},
+					CRC:    0x7da07ec9,
+					Fields: []Parameter{},
+					Type:   TypeCommon(ObjName{Name: "CoolEnumerate"}),
+				}},
+				"auth": {{
+					Name:   ObjName{Group: "auth", Name: "someFunc"},
+					CRC:    0x7da07ec9,
+					Fields: []Parameter{},
+					Type:   TypeCommon(ObjName{Name: "CoolEnumerate"}),
+				}},
+			},
 		},
 	}, {
 		file: "internal/testdata/many_flags.tl",
 		expected: &Schema{
-			Objects: []*Object{{
-				Name: "a",
-				CRC:  0xf2355507,
-				Fields: []Parameter{RequiredParameter{
-					Name: "flags",
-					Type: TypeCommon("#"),
-				}, TriggerParameter{
-					Name:        "opt_prop",
-					FlagTrigger: "flags",
-					BitTrigger:  3,
-				}, RequiredParameter{
-					Name: "flags2",
-					Type: TypeCommon("#"),
-				}, OptionalParameter{
-					Name:        "opt2_prop",
-					Type:        TypeCommon("double"),
-					FlagTrigger: "flags2",
-					BitTrigger:  9,
-				}, RequiredParameter{
-					Name: "id",
-					Type: TypeCommon("long"),
-				}},
-				Type: TypeCommon("ChatFull"),
-			}},
-			TypeComments: map[string]string{},
+			TypeOrder: []ObjName{{Name: "ChatFull"}},
+			Objects: map[ObjName]TypeObjects{
+				{Name: "ChatFull"}: {
+					Objects: []Object{{
+						Name: ObjName{Name: "a"},
+						CRC:  0xf2355507,
+						Fields: []Parameter{BitflagParameter{
+							Name: "flags",
+						}, TriggerParameter{
+							Name:        "opt_prop",
+							FlagTrigger: "flags",
+							BitTrigger:  3,
+						}, BitflagParameter{
+							Name: "flags2",
+						}, OptionalParameter{
+							Name:        "opt2_prop",
+							Type:        TypeCommon(ObjName{Name: "double"}),
+							FlagTrigger: "flags2",
+							BitTrigger:  9,
+						}, RequiredParameter{
+							Name: "id",
+							Type: TypeCommon(ObjName{Name: "long"}),
+						}},
+						Type: TypeCommon(ObjName{Name: "ChatFull"}),
+					}},
+				},
+			},
+			Enums:            map[ObjName]EnumObjects{},
+			MethodGroupOrder: []string{},
+			MethodsGroups:    map[string][]Object{},
 		},
 	}} {
 		tt := tt // for parallel tests
@@ -79,12 +100,42 @@ func TestParseFile(t *testing.T) {
 			data, err := testdata.ReadFile(tt.file)
 			require.NoError(t, err)
 
-			got, err := ParseFile(tt.file, string(data))
+			got, err := ParseString(tt.file, string(data))
 			if !tt.wantErr(t, err) || err != nil {
 				return
 			}
 
 			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestEquality(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		file string
+	}{{
+		name: "simplest",
+		file: "internal/testdata/simplest.tl",
+	}, {
+		name: "many_flags",
+		file: "internal/testdata/many_flags.tl",
+	}, {
+		name: "with_comments",
+		file: "internal/testdata/with_comments.tl",
+	}} {
+		tt := tt // for parallel tests
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			data, err := testdata.ReadFile(tt.file)
+			require.NoError(t, err)
+
+			got, err := ParseString(tt.file, string(data))
+			require.NoError(t, err)
+
+			assert.Equal(t, string(data), got.String())
 		})
 	}
 }

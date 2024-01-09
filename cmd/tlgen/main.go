@@ -6,29 +6,15 @@
 package main
 
 import (
-	"context"
 	"os"
-	"os/signal"
-	"syscall"
+
+	"github.com/xelaj/tl/cmd/tlgen/root"
+	"github.com/xelaj/tl/cmd/tlgen/util"
 )
 
 func main() {
-	err := app.RunContext(initCtx(), os.Args)
-	if err != nil {
-		panic(err)
-	}
-}
+	ctx, cancel := util.NewContext(os.Stdin, os.Stdout, os.Stderr)
+	defer cancel()
 
-func initCtx() context.Context {
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		<-sig
-		cancel()
-		// don't close channel, caus it may cause panic, when app receive
-		// multiple signals, and writing them to closed channel
-	}()
-	return ctx
+	root.Cmd().ExecuteContext(ctx)
 }

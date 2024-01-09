@@ -7,24 +7,52 @@ package schema
 
 import (
 	"fmt"
+	"io"
+	"io/fs"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/alecthomas/participle/v2"
 	"github.com/pkg/errors"
+	"github.com/quenbyako/ext/set"
+	"github.com/quenbyako/ext/slices"
 
 	"github.com/xelaj/tl/schema/internal/declaration"
 	"github.com/xelaj/tl/schema/internal/lexer"
 )
 
 //nolint:gochecknoglobals // obviously parser must be global
-var parser = participle.MustBuild(&declaration.Program{},
+var parser = participle.MustBuild[declaration.Program](
 	participle.Lexer(lexer.NewDefinition()),
 )
 
-func ParseFile(filename, content string) (*Schema, error) {
-	res := &declaration.Program{}
-	err := parser.ParseString(filename, content, res)
+func ParseFile(filename string) (*Schema, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	return Parse(filename, f)
+}
+
+func ParseFS(fsys fs.FS, filename string) (*Schema, error) {
+	f, err := fsys.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	return Parse(filename, f)
+}
+
+func ParseString(filename string, content string) (*Schema, error) {
+	return Parse(filename, strings.NewReader(content))
+}
+
+func Parse(filename string, content io.Reader) (*Schema, error) {
+	res, err := parser.Parse(filename, content)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // it's important to keep error
 	}
@@ -46,10 +74,10 @@ func normalizeIdent(i *declaration.Ident) (Type, error) {
 			return nil, errors.New(i.String() + ": only Vector is allowed to modify")
 		}
 
-		return TypeVector(i.Extension.Inner[0].String()), nil
+		return TypeVector(objNameFromString(i.Extension.Inner[0].String())), nil
 	}
 
-	return TypeCommon(i.Simple.String()), nil
+	return TypeCommon(objNameFromString(i.Simple.String())), nil
 }
 
 func normalizeArgument(arg *declaration.Argument, comment string) (Parameter, error) {
@@ -59,6 +87,13 @@ func normalizeArgument(arg *declaration.Argument, comment string) (Parameter, er
 	}
 
 	if arg.Conditional == nil {
+		if typ, ok := typ.(TypeCommon); ok && typ.Name == "#" {
+			return BitflagParameter{
+				Comment: comment,
+				Name:    arg.Ident.String(),
+			}, nil
+		}
+
 		return RequiredParameter{
 			Comment: comment,
 			Name:    arg.Ident.String(),
@@ -66,7 +101,7 @@ func normalizeArgument(arg *declaration.Argument, comment string) (Parameter, er
 		}, nil
 	}
 
-	if v, ok := typ.(TypeCommon); ok && v == "true" {
+	if v, ok := typ.(TypeCommon); ok && v.Name == "true" {
 		return TriggerParameter{
 			Comment:     comment,
 			Name:        arg.Ident.String(),
@@ -91,7 +126,7 @@ func normalizeCombinator(
 	functionsMode bool,
 ) (*Object, error) {
 	parts := strings.Split(decl.ID, "#") // guaranteed to split by two parts, lexer handles it
-	name := parts[0]
+	name := objNameFromString(parts[0])
 	crcStr := parts[1]
 
 	// same: lexer handles everything already
@@ -135,12 +170,11 @@ func normalizeCombinator(
 	}
 
 	return &Object{
-		Comment:  constructorComment,
-		Name:     name,
-		CRC:      uint32(crc),
-		Fields:   params,
-		Type:     typ,
-		isMethod: functionsMode,
+		Comment: constructorComment,
+		Name:    name,
+		CRC:     uint32(crc),
+		Fields:  params,
+		Type:    typ,
 	}, nil
 }
 
@@ -152,10 +186,10 @@ const (
 	tagParam       = "param"
 )
 
-func normalizeEntries(items []declaration.ProgramEntry, functionsMode bool) ([]*Object, map[string]string, error) {
+func normalizeEntries(items []declaration.ProgramEntry, functionsMode bool) ([]*Object, map[ObjName]string, error) {
 	var (
 		objects      = []*Object{}
-		typeComments = map[string]string{}
+		typeComments = map[ObjName]string{}
 
 		currentTypeComment     string
 		constructorComment     string
@@ -255,12 +289,12 @@ func normalizeEntries(items []declaration.ProgramEntry, functionsMode bool) ([]*
 					return nil, nil, err
 				}
 
-				if _, ok := typeComments[string(v)]; ok {
-					err := errors.New("@type: for " + string(v) + ", type comment defined twice")
+				if _, ok := typeComments[ObjName(v)]; ok {
+					err := errors.New("@type: for " + ObjName(v).String() + ", type comment defined twice")
 					return nil, nil, err
 				}
 
-				typeComments[string(v)] = currentTypeComment
+				typeComments[ObjName(v)] = currentTypeComment
 				currentTypeComment = ""
 			}
 
@@ -274,9 +308,50 @@ func normalizeEntries(items []declaration.ProgramEntry, functionsMode bool) ([]*
 }
 
 func normalizeProgram(program *declaration.Program) (*Schema, error) {
-	types, comments, err := normalizeEntries(program.Constraints, false)
+	typesRaw, comments, err := normalizeEntries(program.Constraints, false)
 	if err != nil {
 		return nil, err
+	}
+
+	typeOrder := []ObjName{}
+	typeSortedOjbects := map[ObjName][]Object{}
+	anyTypeHasField := set.New[ObjName]()
+	for _, obj := range typesRaw {
+		objTypeRaw, ok := obj.Type.(TypeCommon)
+		if !ok {
+			return nil, fmt.Errorf("object %#v: type is not interface", obj.Name)
+		}
+		objType := ObjName(objTypeRaw)
+
+		if !slices.Contains(typeOrder, objType) {
+			typeOrder = append(typeOrder, objType)
+		}
+
+		typeSortedOjbects[objType] = append(typeSortedOjbects[objType], *obj)
+		if len(obj.Fields) > 0 {
+			anyTypeHasField = anyTypeHasField.Add(objType)
+		}
+	}
+
+	types := map[ObjName]TypeObjects{}
+	enums := map[ObjName]EnumObjects{}
+	for typ, objs := range typeSortedOjbects {
+		var comment string
+		if v, ok := comments[typ]; ok {
+			comment = v
+		}
+
+		if anyTypeHasField.Has(typ) {
+			types[typ] = TypeObjects{
+				Comment: comment,
+				Objects: objs,
+			}
+		} else {
+			enums[typ] = EnumObjects{
+				Comment: comment,
+				Objects: objs,
+			}
+		}
 	}
 
 	methods, _, err := normalizeEntries(program.Methods, true)
@@ -284,9 +359,21 @@ func normalizeProgram(program *declaration.Program) (*Schema, error) {
 		return nil, err
 	}
 
+	methodGroupOrder := []string{}
+	methodGroupSortedOjbects := map[string][]Object{}
+	for _, obj := range methods {
+		if !slices.Contains(methodGroupOrder, obj.Name.Group) {
+			methodGroupOrder = append(methodGroupOrder, obj.Name.Group)
+		}
+
+		methodGroupSortedOjbects[obj.Name.Group] = append(methodGroupSortedOjbects[obj.Name.Group], *obj)
+	}
+
 	return &Schema{
-		Objects: append(types, methods...),
-		//	Methods:      methods,
-		TypeComments: comments,
+		TypeOrder:        typeOrder,
+		Objects:          types,
+		Enums:            enums,
+		MethodGroupOrder: methodGroupOrder,
+		MethodsGroups:    methodGroupSortedOjbects,
 	}, nil
 }

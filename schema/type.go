@@ -7,28 +7,25 @@ import (
 )
 
 type Type interface {
-	_isType()
+	_type()
 
 	fmt.Stringer
-	IsInterface() bool
 }
 
 var (
-	_ Type = TypeCommon("")
-	_ Type = TypeVector("")
+	_ Type = TypeCommon(ObjName{})
+	_ Type = TypeVector(ObjName{})
 )
 
-type TypeCommon string
+type TypeCommon ObjName
 
-func (_ TypeCommon) _isType()          {}
-func (t TypeCommon) String() string    { return string(t) }
-func (t TypeCommon) IsInterface() bool { return !isFirstRuneUpper(string(t)) }
+func (_ TypeCommon) _type()         {}
+func (t TypeCommon) String() string { return ObjName(t).String() }
 
-type TypeVector string
+type TypeVector ObjName
 
-func (_ TypeVector) _isType()          {}
-func (t TypeVector) String() string    { return "Vector<" + string(t) + ">" }
-func (t TypeVector) IsInterface() bool { return true }
+func (_ TypeVector) _type()         {}
+func (t TypeVector) String() string { return "Vector<" + ObjName(t).String() + ">" }
 
 func isFirstRuneUpper(s string) bool {
 	r, _ := utf8.DecodeRuneInString(s)

@@ -6,27 +6,51 @@
 package declaration_test
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/alecthomas/participle/v2"
 	"github.com/stretchr/testify/assert"
 
-	. "github.com/xelaj/tl/schema/internal/declaration"
 	"github.com/xelaj/tl/schema/internal/lexer"
+
+	. "github.com/xelaj/tl/schema/internal/declaration"
 )
 
+type TestCase interface {
+	Name() string
+	Run(t *testing.T)
+}
+
+type TcaseParseIt[T any] struct {
+	name    string
+	in      string
+	want    T
+	wantErr assert.ErrorAssertionFunc
+}
+
+func (tt TcaseParseIt[T]) Name() string { return tt.name }
+
+func (tt TcaseParseIt[T]) Run(t *testing.T) {
+	tt.wantErr = noErrAsDefault(tt.wantErr)
+
+	parser := participle.MustBuild[T](
+		participle.Lexer(lexer.NewDefinition()),
+	)
+
+	got, err := parser.ParseString("test.tl", tt.in)
+	if !tt.wantErr(t, err) || err != nil {
+		return
+	}
+
+	assert.Equal(t, tt.want, *got)
+}
+
 func TestParseIt(t *testing.T) {
-	for _, tt := range []struct {
-		name    string
-		in      string
-		want    interface{}
-		wantErr assert.ErrorAssertionFunc
-	}{
-		{
+	for _, tt := range []TestCase{
+		TcaseParseIt[Argument]{
 			name: "args",
 			in:   "user_id:long",
-			want: &Argument{
+			want: Argument{
 				Ident: VarIdentOpt{
 					Ident: &VarIdent{Value: "user_id"},
 				},
@@ -35,10 +59,10 @@ func TestParseIt(t *testing.T) {
 				},
 			},
 		},
-		{
+		TcaseParseIt[CombinatorDecl]{
 			name: "declaration",
 			in:   "a#00000000 flags:# b_x:c_x d:e pipka:flags.2?Vector<popka> = F",
-			want: &CombinatorDecl{
+			want: CombinatorDecl{
 				ID: "a#00000000",
 				Args: []Argument{
 					{
@@ -86,7 +110,7 @@ func TestParseIt(t *testing.T) {
 				},
 			},
 		},
-		{
+		TcaseParseIt[Program]{
 			name: "program",
 			in: `
 a#123 = B;
@@ -99,7 +123,7 @@ c#456 = D;
 e#789 = F;
 g#012 = H;
 `,
-			want: &Program{
+			want: Program{
 				Constraints: []ProgramEntry{
 					{Newline: true},
 					{Decl: &CombinatorDecl{
@@ -128,24 +152,7 @@ g#012 = H;
 			},
 		},
 	} {
-		tt.wantErr = noErrAsDefault(tt.wantErr)
-
-		t.Run(tt.name, func(t *testing.T) {
-			parser := participle.MustBuild(
-				tt.want,
-				participle.Lexer(lexer.NewDefinition()),
-			)
-
-			got := reflect.New(reflect.TypeOf(tt.want).Elem()).Interface()
-
-			err := parser.ParseString("test.tl", tt.in, got)
-
-			if !tt.wantErr(t, err) || err != nil {
-				return
-			}
-
-			assert.Equal(t, tt.want, got)
-		})
+		t.Run(tt.Name(), tt.Run)
 	}
 }
 

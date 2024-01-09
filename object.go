@@ -18,7 +18,6 @@ var (
 	byteSliceTyp   = reflect.TypeOf((*[]byte)(nil)).Elem()
 	objectTyp      = reflect.TypeOf((*Object)(nil)).Elem()
 	unmarshalerTyp = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
-	enumTyp        = reflect.TypeOf((*Enum)(nil)).Elem()
 	uint32Typ      = reflect.TypeOf((*uint32)(nil)).Elem()
 )
 
@@ -28,12 +27,18 @@ type Object interface {
 	CRC() crc32
 }
 
-// Enum is an interface which implementations are ONLY objects without any
-// fields. If enum is not set (null in TL terms), it MUST return zero value in
-// CRC() method.
-type Enum interface {
-	Object
-	fmt.Stringer
+func asObject[T Object](f func() T) func(uint32) Object {
+	return func(uint32) Object { return Object(f()) }
+}
+
+func asEnum[T Object](f func(uint32) (T, bool)) func(uint32) Object {
+	return func(crc uint32) Object {
+		if enum, ok := f(crc); ok {
+			return enum
+		} else {
+			panic(fmt.Sprintf("Invalid enum value: 0x%08x for %T", crc, enum))
+		}
+	}
 }
 
 type Marshaler interface {
@@ -45,7 +50,8 @@ type Unmarshaler interface {
 }
 
 const (
-	MapCrcKey = "_crc"
+	MapCrcKey  = "_crc"
+	MapTypeKey = "_type"
 
 	bitsInByte = 8 // cause we don't want store magic numbers
 
@@ -62,10 +68,11 @@ const (
 	fuckingMagicNumber = 0xfe
 
 	// https://core.telegram.org/schema/mtproto
-	crcVector = 0x1cb5c415
-	crcFalse  = 0xbc799737
-	crcTrue   = 0x997275b5
-	crcNull   = 0x56730bcc
+	crcVector     = 0x1cb5c415
+	crcFalse      = 0xbc799737
+	crcTrue       = 0x997275b5
+	crcNull       = 0x56730bcc
+	crcGzipPacked = 0x3072cfa1
 )
 
 func boolToCRC(v bool) crc32 { //revive:disable:flag-parameter // no, it's not
@@ -79,7 +86,7 @@ func boolToCRC(v bool) crc32 { //revive:disable:flag-parameter // no, it's not
 // Int128 is alias-like type for fixed size of big int (1024 bit value). It
 // using only for tl objects encoding cause native big.Int isn't supported for
 // en(de)coding.
-type Int128 struct{ big.Int }
+type Int128 struct{ *big.Int }
 
 var _ interface {
 	Marshaler
@@ -87,15 +94,15 @@ var _ interface {
 } = (*Int128)(nil)
 
 // NewInt128 creates int128 with zero value.
-func NewInt128(value int) *Int128 { return &Int128{val(big.NewInt(int64(value)))} }
+func NewInt128(value int) *Int128 { return &Int128{big.NewInt(int64(value))} }
 
 // RandomInt128 creates int128 with random value.
-func RandomInt128() *Int128 { return &Int128{val(big.NewInt(0).SetBytes(randBytes(Int128Len)))} }
+func RandomInt128() *Int128 { return &Int128{big.NewInt(0).SetBytes(randBytes(Int128Len))} }
 
 // MarshalTL implements tl marshaler from this package. Just don't use it by
 // your hands, tl.Encoder does all what you need.
 func (i *Int128) MarshalTL(s MarshalState) error {
-	_, err := s.Write(bigIntBytes(&i.Int, Int128Len*bitsInByte))
+	_, err := s.Write(bigIntBytes(i.Int, Int128Len*bitsInByte))
 
 	return err
 }
@@ -108,7 +115,7 @@ func (i *Int128) UnmarshalTL(s UnmarshalState) error {
 		return err
 	}
 	s.SkipBytes(Int128Len)
-	i.Int = val(big.NewInt(0).SetBytes(v))
+	i.Int = big.NewInt(0).SetBytes(v)
 
 	return nil
 }
@@ -116,7 +123,7 @@ func (i *Int128) UnmarshalTL(s UnmarshalState) error {
 // Int256 is alias-like type for fixed size of big int (2048 bit value). It
 // using only for tl objects encoding cause native big.Int isn't supported for
 // en(de)coding.
-type Int256 struct{ big.Int }
+type Int256 struct{ *big.Int }
 
 var _ interface {
 	Marshaler
@@ -124,15 +131,15 @@ var _ interface {
 } = (*Int256)(nil)
 
 // NewInt256 creates int256 with zero value.
-func NewInt256(value int) *Int256 { return &Int256{val(big.NewInt(int64(value)))} }
+func NewInt256(value int) *Int256 { return &Int256{big.NewInt(int64(value))} }
 
 // RandomInt256 creates int256 with random value.
-func RandomInt256() *Int256 { return &Int256{val(big.NewInt(0).SetBytes(randBytes(Int256Len)))} }
+func RandomInt256() *Int256 { return &Int256{big.NewInt(0).SetBytes(randBytes(Int256Len))} }
 
 // MarshalTL implements tl marshaler from this package. Just don't use it by
 // your hands, tl.Encoder does all what you need.
 func (i *Int256) MarshalTL(s MarshalState) error {
-	_, err := s.Write(bigIntBytes(&i.Int, Int256Len*bitsInByte))
+	_, err := s.Write(bigIntBytes(i.Int, Int256Len*bitsInByte))
 
 	return err
 }
@@ -145,29 +152,7 @@ func (i *Int256) UnmarshalTL(s UnmarshalState) error {
 		return err
 	}
 	s.SkipBytes(Int256Len)
-	i.Int = val(big.NewInt(0).SetBytes(v))
+	i.Int = big.NewInt(0).SetBytes(v)
 
-	return nil
-}
-
-// AnyConstructor это специальный тип для декодера, который позволяет ограничить
-// доступный набор конструкторов.
-type AnyConstructor[T Object] struct {
-	Constructor func(crc32) T
-	Result      T
-}
-
-func (b *AnyConstructor[T]) UnmarshalTL(r UnmarshalState) error {
-	crc, err := r.PopCRC()
-	if err != nil {
-		return errReadCRC{err}
-	}
-
-	obj := b.Constructor(crc)
-	if Object(obj) == nil {
-		return ErrObjectNotRegistered(crc)
-	}
-
-	// r.Unmarshal(obj)
 	return nil
 }

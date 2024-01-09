@@ -12,8 +12,17 @@ import (
 	. "github.com/xelaj/tl"
 )
 
+type GenericRequest[T any] struct {
+	MsgID          int64
+	_              null `tl:"flag,bitflag"`
+	IsSpecificType bool `tl:",omitempty:flag:0,implicit"`
+	Msg            T    `tl:",omitempty:flag:1"`
+}
+
+func (*GenericRequest[T]) CRC() uint32 { return uint32(0x77553311) }
+
 type MultipleChats struct {
-	Chats []any
+	Chats []Chat
 }
 
 func (*MultipleChats) CRC() uint32 { return uint32(0xff1144cc) }
@@ -33,6 +42,8 @@ type Chat struct {
 	Version           int32
 	AdminRights       *Rights `tl:",omitempty:flag:14"`
 	BannedRights      *Rights `tl:",omitempty:flag:18"`
+	_                 null    `tl:"flag2,bitflag"`
+	CustomField       bool    `tl:",omitempty:flag2:0,implicit"`
 }
 
 func (*Chat) CRC() uint32 { return uint32(0x3bda1bde) }
@@ -54,16 +65,18 @@ func (*SomeNullStruct) CRC() uint32 { return uint32(0xc4f9186b) }
 
 type AuthSentCodeType interface {
 	Object
-	ImplementsAuthSentCodeType()
+	_AuthSentCodeType()
 }
 
 type AuthSentCodeTypeApp struct {
 	Length int32
 }
 
+var _ AuthSentCodeType = (*AuthSentCodeTypeApp)(nil)
+
 func (*AuthSentCodeTypeApp) CRC() uint32 { return uint32(0x3dbb5986) }
 
-func (*AuthSentCodeTypeApp) ImplementsAuthSentCodeType() {}
+func (*AuthSentCodeTypeApp) _AuthSentCodeType() {}
 
 type Rights struct {
 	//nolint:revive // tl works with unexported tags
@@ -123,7 +136,7 @@ func (*PollAnswerVoters) CRC() uint32 { return uint32(0x3b6ddad2) }
 
 type MessageEntity interface {
 	Object
-	ImplementsMessageEntity()
+	_MessageEntity()
 }
 
 type AccountInstallThemeParams struct {
@@ -138,7 +151,7 @@ func (*AccountInstallThemeParams) CRC() uint32 { return uint32(0x7ae43737) }
 
 type InputTheme interface {
 	Object
-	ImplementsInputTheme()
+	_InputTheme()
 }
 
 type InputThemeObj struct {
@@ -146,9 +159,11 @@ type InputThemeObj struct {
 	AccessHash int64
 }
 
+var _ InputTheme = (*InputThemeObj)(nil)
+
 func (*InputThemeObj) CRC() uint32 { return uint32(0x3c5693e9) }
 
-func (*InputThemeObj) ImplementsInputTheme() {}
+func (*InputThemeObj) _InputTheme() {}
 
 type AccountUnregisterDeviceParams struct {
 	TokenType int32
@@ -174,7 +189,7 @@ func (*AnyStructWithAnyObject) CRC() uint32 { return uint32(0xfd46fd46) }
 
 type InvokeWithLayerParams struct {
 	Layer int32
-	Query any
+	Query Object
 }
 
 func (*InvokeWithLayerParams) CRC() uint32 { return 0xda9b0d0d }
@@ -189,10 +204,10 @@ type InitConnectionParams struct {
 	SystemLangCode string
 	LangPack       string
 	LangCode       string
-	Proxy          any `tl:",omitempty:flag:0"`
-	Params         any `tl:",omitempty:flag:1"`
+	Proxy          Object `tl:",omitempty:flag:0"`
+	Params         Object `tl:",omitempty:flag:1"`
 
-	Query any
+	Query Object
 }
 
 func (*InitConnectionParams) CRC() uint32 { return 0xc1cd5ea9 }
@@ -230,3 +245,12 @@ type PollAnswer struct {
 }
 
 func (*PollAnswer) CRC() uint32 { return 0x6ca9c2e9 }
+
+type DHParamsOk struct {
+	Nonce           *Int128
+	ServerNonce     *Int128
+	EncryptedAnswer []byte
+}
+
+
+func (*DHParamsOk) CRC() uint32 { return 0xd0e8075c }

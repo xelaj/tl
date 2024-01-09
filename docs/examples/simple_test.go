@@ -16,9 +16,7 @@ type RepoUser struct {
 func (c *RepoUser) CRC() uint32 { return 0x12345678 }
 
 func ExampleSimplest() {
-	tl.RegisterObjects(
-		(*RepoUser)(nil),
-	)
+	tl.RegisterObjectDefault[*RepoUser]()
 
 	response := &RepoUser{
 		Nick:    "Hello user!",

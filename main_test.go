@@ -21,28 +21,27 @@ import (
 )
 
 func tearup() {
-	RegisterObjects(
-		&MultipleChats{},
-		&Chat{},
-		&AuthSentCode{},
-		&SomeNullStruct{},
-		&AuthSentCodeTypeApp{},
-		&Rights{},
-		&PollResults{},
-		&PollAnswerVoters{},
-		&AccountInstallThemeParams{},
-		&InputThemeObj{},
-		&AccountUnregisterDeviceParams{},
-		&InvokeWithLayerParams{},
-		&InitConnectionParams{},
-		&ResPQ{},
-		&AnyStructWithAnyType{},
-		&AnyStructWithAnyObject{},
-		&Poll{},
-		&PollAnswer{},
-	)
+	RegisterObjectDefault[*MultipleChats]()
+	RegisterObjectDefault[*Chat]()
+	RegisterObjectDefault[*AuthSentCode]()
+	RegisterObjectDefault[*SomeNullStruct]()
+	RegisterObjectDefault[*AuthSentCodeTypeApp]()
+	RegisterObjectDefault[*Rights]()
+	RegisterObjectDefault[*PollResults]()
+	RegisterObjectDefault[*PollAnswerVoters]()
+	RegisterObjectDefault[*AccountInstallThemeParams]()
+	RegisterObjectDefault[*InputThemeObj]()
+	RegisterObjectDefault[*AccountUnregisterDeviceParams]()
+	RegisterObjectDefault[*InvokeWithLayerParams]()
+	RegisterObjectDefault[*InitConnectionParams]()
+	RegisterObjectDefault[*ResPQ]()
+	RegisterObjectDefault[*AnyStructWithAnyType]()
+	RegisterObjectDefault[*AnyStructWithAnyObject]()
+	RegisterObjectDefault[*Poll]()
+	RegisterObjectDefault[*PollAnswer]()
+	RegisterObjectDefault[*DHParamsOk]()
 
-	RegisterEnums(
+	RegisterEnumDefault[AuthCodeType](
 		AuthCodeTypeSms,
 		AuthCodeTypeCall,
 		AuthCodeTypeFlashCall,

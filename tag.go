@@ -34,6 +34,9 @@ type StructTag struct {
 // ParseTag is a function which parses struct field tag for structes, defined by
 // you.
 //
+//   - `tag` parameter is a text representation of struct field tag.
+//   - `defaultName` is a name of struct field, if it's not defined in tag.
+//
 // how tag could look:
 //
 //	// field named somefield, it could be empty, value is boolean, so it can
@@ -91,7 +94,7 @@ func parseTag(tag, defaultName string, ft reflect.Type) (t StructTag, err error)
 	return t, nil
 }
 
-func ParseStructTags(s any) ([]StructTag, map[int]bitflagBit, error) {
+func ParseStructTags(s Object) ([]StructTag, map[int]BitflagBit, error) {
 	t := indirectType(reflect.TypeOf(s))
 	if t.Kind() != reflect.Struct {
 		return nil, nil, errors.New("value is not a struct")
@@ -100,9 +103,9 @@ func ParseStructTags(s any) ([]StructTag, map[int]bitflagBit, error) {
 	return parseStructTags(t)
 }
 
-func parseStructTags(t reflect.Type) ([]StructTag, map[int]bitflagBit, error) {
+func parseStructTags(t reflect.Type) ([]StructTag, map[int]BitflagBit, error) {
 	tags := make([]StructTag, t.NumField())
-	optional := map[int]bitflagBit{}
+	optional := map[int]BitflagBit{}
 	tagNamesIndexes := make(map[string]int, t.NumField())
 	for i := 0; i < t.NumField(); i++ {
 		ft := t.Field(i)
@@ -125,8 +128,14 @@ func parseStructTags(t reflect.Type) ([]StructTag, map[int]bitflagBit, error) {
 			return nil, nil, fmt.Errorf("tag %v as bitflag not found in struct", tags[i].BitFlags.TargetField)
 		}
 
-		switch ft.Type.Kind() { //nolint:exhaustive // passes 4 kinds, otherwise panics
+		switch ft.Type.Kind() { //nolint:exhaustive // passes 5 kinds, otherwise panics
 		case reflect.Ptr, reflect.Interface, reflect.Slice:
+		case reflect.Uint32:
+			if ft.Type.ConvertibleTo(objectTyp) {
+				break
+			}
+
+			fallthrough
 		case reflect.Bool:
 			if _, ok := tags[i].Type.(fieldImplicitBool); ok {
 				break
@@ -134,13 +143,13 @@ func parseStructTags(t reflect.Type) ([]StructTag, map[int]bitflagBit, error) {
 
 			fallthrough
 		default:
-			panic(fmt.Sprintf("%v: field tagged as omitempty, but kind is not pointer to "+
-				"value or bool", typName))
+			panic(fmt.Sprintf("%v: field tagged as omitempty, but kind is neither pointer to "+
+				"value, nor enum, nor bool", typName))
 		}
 
-		optional[i] = bitflagBit{
-			fieldIndex: targetField,
-			bitIndex:   int(bitflags.BitPosition),
+		optional[i] = BitflagBit{
+			FieldIndex: targetField,
+			BitIndex:   int(bitflags.BitPosition),
 		}
 	}
 
@@ -360,3 +369,54 @@ type fieldCustom struct {
 }
 
 func (fieldCustom) _fieldType() {}
+
+func typStructFields(typ reflect.Type) structFields {
+	typData := structFields{
+		tags:     make([]StructTag, typ.NumField()),
+		bitflags: make(map[int]BitflagBit),
+	}
+
+	tagNamesIndexes := make(map[string]int, typ.NumField())
+	for i := 0; i < typ.NumField(); i++ {
+		fTyp := typ.Field(i)
+		typName := typ.Name() + "." + fTyp.Name
+
+		tag, err := ParseTag(fTyp.Tag.Get(tagName), fTyp.Name)
+		if err != nil {
+			panic(fmt.Sprintf("parsing tag of %v: %v", typName, err.Error()))
+		}
+		tagNamesIndexes[tag.Name] = i
+
+		if tag.BitFlags != nil {
+			targetField, ok := tagNamesIndexes[tag.BitFlags.TargetField]
+			if !ok {
+				panic(fmt.Sprintf("%v: field is optional, but bitflags indicating that this "+
+					"field became after exact field", typName))
+			}
+
+			switch fTyp.Type.Kind() { //nolint:exhaustive // passes 4 kinds, otherwise panics
+			case reflect.Bool, reflect.Ptr, reflect.Interface, reflect.Slice:
+			default:
+				// enum is specific case, 0 value is always null
+				if fTyp.Type.Implements(objectTyp) && fTyp.Type.Kind() == reflect.Uint32 {
+					break
+				}
+				panic(fmt.Sprintf("%v: field tagged as omitempty, but kind is not pointer to "+
+					"value or bool", typName))
+			}
+
+			typData.bitflags[i] = BitflagBit{
+				FieldIndex: targetField,
+				BitIndex:   int(tag.BitFlags.BitPosition),
+			}
+
+			if tag.isImplicit() && fTyp.Type.Kind() != reflect.Bool {
+				panic(fmt.Sprintf("%v: %q tag works only for bool fields", typName, implicitFlag))
+			}
+		}
+
+		typData.tags[i] = tag
+	}
+
+	return typData
+}

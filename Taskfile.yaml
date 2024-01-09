@@ -19,5 +19,5 @@ tasks:
   test:
     deps: [deps:gotest]
     cmds:
-      - cmd: gotest -v -timeout 1m -race ./...
+      - cmd: gotest -v -timeout 1m -race -cover -json ./... | tparse -all
         desc: running tests

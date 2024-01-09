@@ -47,11 +47,11 @@ linters-settings:
       - { name: function-result-limit, arguments: [2] }
       - { name: max-public-structs, arguments: [15] }
       - { name: banned-characters, disabled: true } # replaced to ???
-      - { name: function-length, disabled: true }   # replaced to funlen
-      - { name: file-header, disabled: true }       # replaced to goheader
-      - { name: cyclomatic, disabled: true }        # replaced to gocyclo
+      - { name: function-length, disabled: true } # replaced to funlen
+      - { name: file-header, disabled: true } # replaced to goheader
+      - { name: cyclomatic, disabled: true } # replaced to gocyclo
       - { name: line-length-limit, disabled: true } # replaced to lll
-      - { name: add-constant, disabled: true }      # replaced to gomnd
+      - { name: add-constant, disabled: true } # replaced to gomnd
 
   gomnd:
     settings:

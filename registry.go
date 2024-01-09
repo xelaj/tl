@@ -6,8 +6,11 @@
 package tl
 
 import (
+	"cmp"
 	"fmt"
 	"reflect"
+
+	"github.com/quenbyako/ext/slices"
 )
 
 // key is crc code, value is name of constructor.
@@ -15,8 +18,17 @@ type enumNames = map[crc32]string
 type typeName = string
 
 type Registry interface {
-	ConstructObject(typ typeName, code crc32) (Object, structFields, bool)
-	Tags(code crc32) ([]StructTag, bool)
+	ConstructObject(code crc32) (Object, bool)
+}
+
+var _defaultRegistry = val(NewRegistry())
+
+func DefaultRegistry() *ObjectRegistry { return &_defaultRegistry }
+
+func RegisterObjectDefault[T Object]()         { RegisterObject[T](&_defaultRegistry) }
+func RegisterEnumDefault[T Object](enums ...T) { RegisterEnum[T](&_defaultRegistry, enums...) }
+func RegisterCustomDefault[T Object](constructor func(uint32) T, crcs ...uint32) {
+	RegisterCustom[T](&_defaultRegistry, constructor, crcs...)
 }
 
 // ObjectRegistry is a type, which handles code generated schema, and could be
@@ -26,44 +38,25 @@ type Registry interface {
 // If you are not able to use codegen, use RawSchemaRegistry, it could be
 // slower, but more flexible.
 type ObjectRegistry struct {
-	// in objects it's allowed to store ONLY structs
-	objects      map[crc32]reflect.Type
-	structFields map[crc32]structFields
-	// enumStrings are specific case unlike objects: we can already predict enum
-	// type (cause enum is an interface, which are implemented only in objects
-	// without arguments). It's guaranteed that we know enum type, so no need to
-	enums     map[crc32]Enum
-	enumNames enumNames
+	// in objects it's allowed to store ONLY structs and uint32.
+	objects map[crc32]func(uint32) Object
 }
 
-func (r *ObjectRegistry) pushObject(crc crc32, typ reflect.Type) {
-	if typ.Kind() != reflect.Struct {
-		panic("accepted only structs")
-	}
+var _ Registry = (*ObjectRegistry)(nil)
 
-	if r.objects == nil {
-		r.objects = make(map[crc32]reflect.Type)
+func NewRegistry() *ObjectRegistry {
+	return &ObjectRegistry{
+		objects: make(map[crc32]func(uint32) Object),
 	}
-	r.objects[crc] = typ
 }
 
-// spawnObject spawns new object by crc code from registry.
-func (r *ObjectRegistry) spawnObject(crc crc32) (reflect.Value, error) {
-	_type, ok := r.objects[crc]
-	if !ok {
-		return reflect.Value{}, ErrObjectNotRegistered(crc)
+// ConstructObject spawns new object by crc code from registry.
+func (r *ObjectRegistry) ConstructObject(crc crc32) (Object, bool) {
+	if obj, ok := r.objects[crc]; ok {
+		return obj(crc), true
 	}
 
-	v := reflect.New(_type).Elem()
-	if !v.Type().Implements(objectTyp) {
-		v = v.Addr()
-	}
-	if !v.Type().Implements(objectTyp) {
-		panic("internal error: " +
-			"object neither implements object as raw struct, nor pointer " + v.Type().String())
-	}
-
-	return v, nil
+	return nil, false
 }
 
 type field struct {
@@ -75,16 +68,10 @@ type field struct {
 	optional    bool
 }
 
-//nolint:gochecknoglobals // obvious reason to do that.
-var defaultRegistry = &ObjectRegistry{}
-
-func RegisterObjects(objects ...Object) { defaultRegistry.RegisterObjects(objects...) }
-func RegisterEnums(enums ...Enum)       { defaultRegistry.RegisterEnums(enums...) }
-
 type structFields struct {
 	// key is an index of optional field in list of fields in object
 	// value is bit, which you need to trigger
-	bitflags map[int]bitflagBit
+	bitflags map[int]BitflagBit
 	tags     []StructTag
 }
 
@@ -94,98 +81,73 @@ func (s *structFields) isFieldOptional(fieldIndex int) bool {
 	return ok
 }
 
-type bitflagBit struct {
-	fieldIndex int // в какое поле пихать бит что поле существует
-	bitIndex   int // собственно в какой бит пихать флаг что все ок
+type BitflagBit struct {
+	FieldIndex int // в какое поле пихать бит что поле существует
+	BitIndex   int // собственно в какой бит пихать флаг что все ок
 }
 
-func (r *ObjectRegistry) RegisterObjects(objects ...Object) {
-	for _, object := range objects {
-		r.registerObject(object)
-	}
+func RegisterObject[T Object](r *ObjectRegistry) {
+	r.registerObject(asObject(new[T]))
 }
 
-func (r *ObjectRegistry) registerObject(o Object) {
-	if o == nil {
-		panic("object is nil")
+func RegisterEnum[T Object](r *ObjectRegistry, enums ...T) {
+	if t := new[T](); reflect.TypeOf(t).Kind() != reflect.Uint32 {
+		panic("enums must be uint32")
 	}
 
-	typ := reflect.TypeOf(o)
+	if len(enums) == 0 {
+		panic("no enums provided")
+	}
+
+
+	enums = slices.SortFunc(enums, func(a, b T) int { return cmp.Compare(a.CRC(), b.CRC()) })
+
+	f := func(crc uint32) (res T, ok bool) {
+		if i, ok := slices.BinarySearchFunc(enums, crc, func(enum T, crc uint32) int {
+			return cmp.Compare(enum.CRC(), crc)
+		}); ok {
+			return enums[i], true
+		}
+
+		return res, false
+	}
+
+	r.registerCustom(slices.Remap(enums, func(enum T) uint32 { return enum.CRC() }), asEnum(f))
+}
+
+func RegisterCustom[T Object](r *ObjectRegistry, constructor func(uint32) T, crcs ...uint32) {
+	if len(crcs) == 0 {
+		panic("no enums provided")
+	}
+	r.registerCustom(crcs, func(u uint32) Object { return constructor(u) })
+}
+
+func (r *ObjectRegistry) registerObject(c func(uint32) Object) {
+	typ := reflect.TypeOf(c(0))
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
 	}
-	typData := structFields{
-		tags:     make([]StructTag, typ.NumField()),
-		bitflags: make(map[int]bitflagBit),
+
+	if typ.Kind() != reflect.Struct {
+		panic("accepted only structs")
 	}
 
-	tagNamesIndexes := make(map[string]int, typ.NumField())
-	for i := 0; i < typ.NumField(); i++ {
-		fTyp := typ.Field(i)
-		typName := typ.Name() + "." + fTyp.Name
-
-		tag, err := ParseTag(fTyp.Tag.Get(tagName), fTyp.Name)
-		if err != nil {
-			panic(fmt.Sprintf("parsing tag of %v: %v", typName, err.Error()))
-		}
-		tagNamesIndexes[tag.Name] = i
-
-		if tag.BitFlags != nil {
-			targetField, ok := tagNamesIndexes[tag.BitFlags.TargetField]
-			if !ok {
-				panic(fmt.Sprintf("%v: field is optional, but bitflags indicating that this "+
-					"field became after exact field", typName))
-			}
-
-			switch fTyp.Type.Kind() { //nolint:exhaustive // passes 4 kinds, otherwise panics
-			case reflect.Bool, reflect.Ptr, reflect.Interface, reflect.Slice:
-			default:
-				// enum is specific case, 0 value is always null
-				if fTyp.Type.Implements(enumTyp) {
-					break
-				}
-				panic(fmt.Sprintf("%v: field tagged as omitempty, but kind is not pointer to "+
-					"value or bool", typName))
-			}
-
-			typData.bitflags[i] = bitflagBit{
-				fieldIndex: targetField,
-				bitIndex:   int(tag.BitFlags.BitPosition),
-			}
-
-			if tag.isImplicit() && fTyp.Type.Kind() != reflect.Bool {
-				panic(fmt.Sprintf("%v: %q tag works only for bool fields", typName, implicitFlag))
-			}
-		}
-
-		typData.tags[i] = tag
+	if r.objects == nil {
+		r.objects = make(map[crc32]func(uint32) Object)
+	}
+	crc := c(0).CRC()
+	if _, ok := r.objects[crc]; ok {
+		panic(fmt.Sprintf("object with code %x already registered", crc))
 	}
 
-	if r.structFields == nil {
-		r.structFields = make(map[crc32]structFields)
-	}
-	r.structFields[o.CRC()] = typData
-	r.pushObject(o.CRC(), typ)
+	r.objects[crc] = c
 }
 
-func (r *ObjectRegistry) RegisterEnums(enums ...Enum) {
-	for _, enum := range enums {
-		r.registerEnum(enum)
+func (r *ObjectRegistry) registerCustom(valid []uint32, c func(uint32) Object) {
+	if r.objects == nil {
+		r.objects = make(map[crc32]func(uint32) Object)
 	}
-}
-
-func (r *ObjectRegistry) registerEnum(enum Enum) {
-	if enum == nil {
-		panic("enum is nil")
+	for _, enum := range valid {
+		r.objects[enum] = c
 	}
-
-	if r.enums == nil {
-		r.enums = make(map[uint32]Enum, 1)
-	}
-	r.enums[enum.CRC()] = enum
-
-	if r.enumNames == nil {
-		r.enumNames = make(map[uint32]string, 1)
-	}
-	r.enumNames[enum.CRC()] = enum.String()
 }

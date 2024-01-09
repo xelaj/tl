@@ -6,6 +6,7 @@
 package tl
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 )
@@ -112,10 +113,10 @@ func wrapPath(err error, path string) error { //cover:ignore
 		return nil
 	}
 
-	if err, ok := as118[ErrPath](err); ok {
-		err.Path += "." + path
+	if e := new[ErrPath](); errors.As(err, &e) {
+		e.Path += "." + path
 
-		return err
+		return e
 	}
 
 	return ErrPath{

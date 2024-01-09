@@ -5,18 +5,21 @@ import (
 	"math"
 	"strings"
 
+	"github.com/quenbyako/ext/slices"
 	"golang.org/x/exp/constraints"
 )
 
 type Parameters []Parameter
 
 func (p Parameters) String() string {
-	return strings.Join(slicesRemap(p, func(p Parameter) string { return p.String() }), " ")
+	return strings.Join(slices.Remap(p, func(p Parameter) string { return p.String() }), " ")
 }
 
 func (p Parameters) Comments() []string {
-	paramMaxLen := slicesMaxFunc(p, func(p Parameter) int { return len([]rune(p.GetName())) })
-	return slicesRemap(p, func(p Parameter) string {
+	params := slices.Filter(p, func(p Parameter) bool { return p.GetComment() != "" })
+	paramMaxLen := slicesMaxFunc(params, func(p Parameter) int { return len([]rune(p.GetName())) })
+
+	return slices.Remap(params, func(p Parameter) string {
 		return fmt.Sprintf("// @param %-*v %v", paramMaxLen, p.GetName(), p.GetComment())
 	})
 }
@@ -30,10 +33,21 @@ type Parameter interface {
 }
 
 var (
+	_ Parameter = BitflagParameter{}
 	_ Parameter = RequiredParameter{}
 	_ Parameter = OptionalParameter{}
 	_ Parameter = TriggerParameter{}
 )
+
+type BitflagParameter struct {
+	Comment string
+	Name    string
+}
+
+func (_ BitflagParameter) _Parameter()        {}
+func (t BitflagParameter) GetName() string    { return t.Name }
+func (t BitflagParameter) GetComment() string { return t.Comment }
+func (t BitflagParameter) String() string     { return t.Name + ":#" }
 
 type RequiredParameter struct {
 	Comment string
@@ -73,15 +87,6 @@ func (t TriggerParameter) GetName() string    { return t.Name }
 func (t TriggerParameter) GetComment() string { return t.Comment }
 func (t TriggerParameter) String() string {
 	return fmt.Sprintf("%v:%v.%v?true", t.Name, t.FlagTrigger, t.BitTrigger)
-}
-
-func slicesRemap[S ~[]I, I, K any](s S, f func(I) K) []K {
-	k := make([]K, len(s))
-	for i, item := range s {
-		k[i] = f(item)
-	}
-
-	return k
 }
 
 func slicesMaxFunc[S ~[]T, T any](s S, f func(T) int) int {

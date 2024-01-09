@@ -1,50 +1,37 @@
-// Copyright (c) 2022 Xelaj Software
-//
-// This file is a part of tl package.
-// See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
-
-package main
+package util
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"sync"
 
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/pkg/errors"
-	"github.com/urfave/cli/v2"
-
 	"github.com/xelaj/tl/schema"
+	"github.com/xelaj/tl/schema/proto"
 )
-
-func Action(_ *cli.Context) error {
-	return nil
-}
 
 func DetectAndParseSchema(filename, predictedMime string, r io.Reader) (*schema.Schema, error) {
 	if predictedMime == "" {
 		buf := bufio.NewReader(r)
 		r = buf
+
 		b, err := buf.Peek(mimeBufferMax)
 		if err != nil {
-			return nil, errors.Wrap(err, "predicting data format")
+			return nil, fmt.Errorf("predicting data format: %w", err)
 		}
 		predictedMime = predictMime(b)
 	}
 
 	switch predictedMime {
 	case mimeTypeLang:
-		data, err := io.ReadAll(r)
-		if err != nil {
-			return nil, err
-		}
-
-		return schema.ParseFile(filename, string(data))
+		return schema.Parse(filename, r)
 
 	case mimeProtobuf:
-		return nil, errors.New("protofiles are not supported yet")
+		return proto.Parse(filename, r)
+
 	default:
-		return nil, errors.New(predictedMime + " is not supported")
+		return nil, fmt.Errorf("%#v is not supported", predictedMime)
 	}
 }
 
@@ -62,9 +49,9 @@ var onceExtend sync.Once
 
 func predictMime(b []byte) string {
 	onceExtend.Do(func() {
+		mimetype.SetLimit(mimeBufferMax)
 		mimetype.Extend(schema.IsTypeLangDefinition, mimeTypeLang, ".tl")
 	})
 
-	mimetype.SetLimit(mimeBufferMax)
 	return mimetype.Detect(b).String()
 }

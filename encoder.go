@@ -8,12 +8,10 @@ package tl
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
-
-	"github.com/k0kubun/pp"
-	"github.com/pkg/errors"
 )
 
 func Marshal(v any) ([]byte, error) {
@@ -176,7 +174,7 @@ func (e *encoder) encodeStruct(v reflect.Value, ignoreCRC bool) error {
 
 	properties, bitflags, err := parseStructTags(typ)
 	if err != nil {
-		return errors.Wrap(err, "parsing struct flags")
+		return fmt.Errorf("parsing struct flags: %w", err)
 	}
 
 	optFlags := make(map[int]crc32)
@@ -187,8 +185,6 @@ func (e *encoder) encodeStruct(v reflect.Value, ignoreCRC bool) error {
 			optFlags[target.FieldIndex] = 0
 		}
 		if isFieldContainsData(v.Field(i)) {
-			pp.Println(v.Type().Field(i).Name)
-			pp.Println(v.Field(i).Interface())
 			optFlags[target.FieldIndex] |= 1 << target.BitIndex
 		}
 	}
@@ -227,7 +223,7 @@ func (e *encoder) encodeStruct(v reflect.Value, ignoreCRC bool) error {
 
 		err := e.encodeValue(v.Field(i))
 		if err != nil {
-			return errors.Wrapf(err, "encoding %v", v.Type().Field(i).Name)
+			return fmt.Errorf("encoding %v: %w", v.Type().Field(i).Name, err)
 		}
 	}
 
@@ -304,7 +300,7 @@ func (e *encoder) encodeVector(slice reflect.Value) error {
 		item := slice.Index(i)
 		err := e.encodeValue(item)
 		if err != nil {
-			return errors.Wrapf(err, "[%v]", i)
+			return fmt.Errorf("[%v]: %w", i, err)
 		}
 	}
 

@@ -6,6 +6,7 @@
 package schema
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -14,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/alecthomas/participle/v2"
-	"github.com/pkg/errors"
 	"github.com/quenbyako/ext/set"
 	"github.com/quenbyako/ext/slices"
 
@@ -83,7 +83,7 @@ func normalizeIdent(i *declaration.Ident) (Type, error) {
 func normalizeArgument(arg *declaration.Argument, comment string) (Parameter, error) {
 	typ, err := normalizeIdent(&arg.Term)
 	if err != nil {
-		return nil, errors.Wrap(err, arg.Ident.String())
+		return nil, fmt.Errorf("%v: %w", arg.Ident.String(), err)
 	}
 
 	if arg.Conditional == nil {
@@ -148,7 +148,7 @@ func normalizeCombinator(
 		var argErr error
 		params[i], argErr = normalizeArgument(&arg, comment)
 		if argErr != nil {
-			return nil, errors.Wrap(argErr, decl.ID)
+			return nil, fmt.Errorf("%v: %w", decl.ID, argErr)
 		}
 	}
 
@@ -157,7 +157,7 @@ func normalizeCombinator(
 		Extension: decl.Result.Expr,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, decl.ID+": parsing return type")
+		return nil, fmt.Errorf(decl.ID+": parsing return type: %w", err)
 	}
 
 	if len(argsComments) != 0 {

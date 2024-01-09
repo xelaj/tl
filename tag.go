@@ -6,12 +6,11 @@
 package tl
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // tag name of struct tags.
@@ -78,7 +77,7 @@ func parseTag(tag, defaultName string, ft reflect.Type) (t StructTag, err error)
 			}
 
 		default:
-			return StructTag{}, errors.Wrap(ErrInvalidTagOption, option)
+			return StructTag{}, fmt.Errorf("%v: %w", option, ErrInvalidTagOption)
 		}
 	}
 	if t.Type == nil && ft != nil {
@@ -113,7 +112,7 @@ func parseStructTags(t reflect.Type) ([]StructTag, map[int]BitflagBit, error) {
 
 		var err error
 		if tags[i], err = ParseTag(ft.Tag.Get(tagName), ft.Name); err != nil {
-			return nil, nil, errors.Wrapf(err, "parsing tag of %v", typName)
+			return nil, nil, fmt.Errorf("parsing tag of %v: %w", typName, err)
 		}
 
 		tagNamesIndexes[tags[i].Name] = i
@@ -220,12 +219,12 @@ func parseOmitemptyTag(opt string) (*Bitflag, error) {
 	parts := strings.Split(opt, ":")
 
 	if len(parts) != omitemptyParts {
-		return nil, errors.Wrap(ErrInvalidTagFormat, omitemptyPrefix)
+		return nil, fmt.Errorf("%v: %w", omitemptyPrefix, ErrInvalidTagFormat)
 	}
 
 	pos, err := parseUintMax32(parts[2])
 	if err != nil {
-		return nil, errors.Wrap(err, omitemptyPrefix)
+		return nil, fmt.Errorf("%v: %w", omitemptyPrefix, err)
 	}
 
 	return &Bitflag{

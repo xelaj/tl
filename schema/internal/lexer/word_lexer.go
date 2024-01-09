@@ -7,9 +7,9 @@
 package lexer
 
 import (
+	"errors"
 	"unicode"
 
-	"github.com/pkg/errors"
 	"golang.org/x/text/unicode/rangetable"
 )
 

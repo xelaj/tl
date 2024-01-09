@@ -8,12 +8,12 @@ package tl
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
 	"reflect"
 
-	"github.com/pkg/errors"
 	"golang.org/x/exp/constraints"
 )
 

@@ -1,3 +1,8 @@
+// Copyright (c) 2022-2024 Xelaj Software
+//
+// This file is a part of tl package.
+// See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
+
 package util
 
 import (
@@ -64,7 +69,7 @@ func GetInput[T any](app AppCtx[T], pathFlag string) (io.Reader, error) {
 
 // newContext creates a new context with all wrappers, including:
 // - context attached to signals
-// - logger injected in context
+// - logger injected in context.
 func NewContext(stdin io.Reader, stdout, stderr io.Writer) (context.Context, context.CancelFunc) {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 

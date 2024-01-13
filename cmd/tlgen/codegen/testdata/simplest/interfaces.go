@@ -8242,6 +8242,7 @@ func (*PageTableRow) CRC() uint32 {
 }
 func (*PageTableRow) _IPageTableRow() {}
 
+// Key derivation function to use when generating the [password hash for SRP two-factor authorization](https://core.telegram.org/api/srp
 type IPasswordKdfAlgo interface {
 	tl.Object
 	_IPasswordKdfAlgo()
@@ -8252,6 +8253,7 @@ var (
 	_ IPasswordKdfAlgo = (*PasswordKdfAlgoSHA256SHA256Pbkdf2Hmacsha512Iter100000SHA256ModPow)(nil)
 )
 
+// Unknown KDF (most likely, the client is outdated and does not support the specified KDF algorithm)
 type PasswordKdfAlgoUnknown struct{}
 
 func (*PasswordKdfAlgoUnknown) CRC() uint32 {
@@ -8259,11 +8261,12 @@ func (*PasswordKdfAlgoUnknown) CRC() uint32 {
 }
 func (*PasswordKdfAlgoUnknown) _IPasswordKdfAlgo() {}
 
+// This key derivation algorithm defines that [SRP 2FA login](https://core.telegram.org/api/srp) must be used
 type PasswordKdfAlgoSHA256SHA256Pbkdf2Hmacsha512Iter100000SHA256ModPow struct {
-	Salt1 []byte
-	Salt2 []byte
-	G     int32
-	P     []byte
+	Salt1 []byte // One of two salts used by the derivation function
+	Salt2 []byte // One of two salts used by the derivation function
+	G     int32  // Base
+	P     []byte // 2048-bit modulus
 }
 
 func (*PasswordKdfAlgoSHA256SHA256Pbkdf2Hmacsha512Iter100000SHA256ModPow) CRC() uint32 {
@@ -13268,8 +13271,8 @@ var (
 // Telegram Passport authorization form
 type AccountAuthorizationForm struct {
 	_                struct{}              `tl:"flags,bitflag"`
-	RequiredTypes    []ISecureRequiredType // Required Telegram Passport¹ documents
-	Values           []ISecureValue        // Already submitted Telegram Passport¹ documents
+	RequiredTypes    []ISecureRequiredType // Required Telegram Passport documents
+	Values           []ISecureValue        // Already submitted Telegram Passport documents
 	Errors           []ISecureValueError
 	Users            []IUser // Info about the bot to which the form will be submitted
 	PrivacyPolicyURL *string `tl:",omitempty:flags:0"` // URL of the service's privacy policy
@@ -20987,23 +20990,24 @@ func MessagesSetTyping(ctx context.Context, m Requester, i MessagesSetTypingRequ
 	return res, request(ctx, m, &i, &res)
 }
 
+// Sends a message to a chat
 type MessagesSendMessageRequest struct {
-	_                      struct{} `tl:"flags,bitflag"`
-	NoWebpage              bool     `tl:",omitempty:flags:1,implicit"`
-	Silent                 bool     `tl:",omitempty:flags:5,implicit"`
-	Background             bool     `tl:",omitempty:flags:6,implicit"`
-	ClearDraft             bool     `tl:",omitempty:flags:7,implicit"`
-	Noforwards             bool     `tl:",omitempty:flags:14,implicit"`
-	UpdateStickersetsOrder bool     `tl:",omitempty:flags:15,implicit"`
-	InvertMedia            bool     `tl:",omitempty:flags:16,implicit"`
-	Peer                   IInputPeer
-	ReplyTo                IInputReplyTo `tl:",omitempty:flags:0"`
-	Message                string
-	RandomID               int64
-	ReplyMarkup            IReplyMarkup     `tl:",omitempty:flags:2"`
-	Entities               []IMessageEntity `tl:",omitempty:flags:3"`
-	ScheduleDate           *int32           `tl:",omitempty:flags:10"`
-	SendAs                 IInputPeer       `tl:",omitempty:flags:13"`
+	_                      struct{}         `tl:"flags,bitflag"`
+	NoWebpage              bool             `tl:",omitempty:flags:1,implicit"`  // Set this flag to disable generation of the webpage preview
+	Silent                 bool             `tl:",omitempty:flags:5,implicit"`  // Send this message silently (no notifications for the receivers)
+	Background             bool             `tl:",omitempty:flags:6,implicit"`  // Send this message as background message
+	ClearDraft             bool             `tl:",omitempty:flags:7,implicit"`  // Clear the draft field
+	Noforwards             bool             `tl:",omitempty:flags:14,implicit"` // Only for bots, disallows forwarding and saving of the messages, even if the destination chat doesn't have [content protection](https://telegram.org/blog/protected-content-delete-by-date-and-more) enabled
+	UpdateStickersetsOrder bool             `tl:",omitempty:flags:15,implicit"` // Whether to move used stickersets to top, [more info on this flag](https://core.telegram.org/api/stickers#recent-stickersets)
+	InvertMedia            bool             `tl:",omitempty:flags:16,implicit"`
+	Peer                   IInputPeer       // The destination where the message will be sent
+	ReplyTo                IInputReplyTo    `tl:",omitempty:flags:0"`
+	Message                string           // The message
+	RandomID               int64            // Unique client message ID required to prevent message resending
+	ReplyMarkup            IReplyMarkup     `tl:",omitempty:flags:2"`  // Reply markup for sending bot buttons
+	Entities               []IMessageEntity `tl:",omitempty:flags:3"`  // Message [entities](https://core.telegram.org/api/entities) for sending styled text
+	ScheduleDate           *int32           `tl:",omitempty:flags:10"` // Scheduled message date for [scheduled messages](https://core.telegram.org/api/scheduled-messages)
+	SendAs                 IInputPeer       `tl:",omitempty:flags:13"` // Send this message as the specified peer
 }
 
 func (*MessagesSendMessageRequest) CRC() uint32 {

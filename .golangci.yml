@@ -69,6 +69,7 @@ linters-settings:
   goheader:
     values:
       const:
+        PACKAGE_NAME: tl
         OWNER_COMPANY: Xelaj Software
         LICENSE_URL: https://github.com/xelaj/tl/blob/master/LICENSE_README.md
     template-path: docs/.license_header.txt
@@ -128,6 +129,7 @@ linters:
     - gochecknoinits
     - gocognit
     - goconst
+    - goheader
     # - gocritic # 1.18 incompatible
     - gocyclo
     - godot
@@ -188,5 +190,5 @@ linters:
     # - wsl
 
 service:
-  project-path: github.com/xelaj/logger
+  project-path: github.com/xelaj/tl
   golangci-lint-version: 1.45.x

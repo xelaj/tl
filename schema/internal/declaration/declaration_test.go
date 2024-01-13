@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Xelaj Software
+// Copyright (c) 2022-2024 Xelaj Software
 //
 // This file is a part of tl package.
 // See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
@@ -11,9 +11,8 @@ import (
 	"github.com/alecthomas/participle/v2"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/xelaj/tl/schema/internal/lexer"
-
 	. "github.com/xelaj/tl/schema/internal/declaration"
+	"github.com/xelaj/tl/schema/internal/lexer"
 )
 
 type TestCase interface {

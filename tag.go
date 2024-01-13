@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Xelaj Software
+// Copyright (c) 2022-2024 Xelaj Software
 //
 // This file is a part of tl package.
 // See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
@@ -48,7 +48,7 @@ func ParseTag(tag, defaultName string) (StructTag, error) {
 	return parseTag(tag, defaultName, nil)
 }
 
-// ft is optional, you can add related type later
+// ft is optional, you can add related type later.
 func parseTag(tag, defaultName string, ft reflect.Type) (t StructTag, err error) {
 	parts := strings.Split(tag, ",")
 	name := parts[0]

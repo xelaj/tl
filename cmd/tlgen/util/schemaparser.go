@@ -1,3 +1,8 @@
+// Copyright (c) 2022-2024 Xelaj Software
+//
+// This file is a part of tl package.
+// See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
+
 package util
 
 import (
@@ -7,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/gabriel-vasile/mimetype"
+
 	"github.com/xelaj/tl/schema"
 	"github.com/xelaj/tl/schema/proto"
 )

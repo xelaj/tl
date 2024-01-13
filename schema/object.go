@@ -1,3 +1,8 @@
+// Copyright (c) 2022-2024 Xelaj Software
+//
+// This file is a part of tl package.
+// See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
+
 package schema
 
 import (
@@ -90,7 +95,7 @@ func (o ObjectType) String() string {
 // `messages.clearRecentStickers flags:# = Bool`
 //
 // For vectors like `getSmthn items:Vector<int> = Bool` i still don't understand
-// how to generate, cause it fails in real mtproto schema
+// how to generate, cause it fails in real mtproto schema.
 func (o *Object) getCRC() uint32 {
 	if o.CRC != 0 {
 		return o.CRC

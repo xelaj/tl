@@ -1,3 +1,8 @@
+// Copyright (c) 2022-2024 Xelaj Software
+//
+// This file is a part of tl package.
+// See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
+
 package proto_test
 
 import (
@@ -6,8 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xelaj/tl/schema"
 
+	"github.com/xelaj/tl/schema"
 	. "github.com/xelaj/tl/schema/proto"
 )
 

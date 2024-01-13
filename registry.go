@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Xelaj Software
+// Copyright (c) 2022-2024 Xelaj Software
 //
 // This file is a part of tl package.
 // See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
@@ -14,8 +14,10 @@ import (
 )
 
 // key is crc code, value is name of constructor.
-type enumNames = map[crc32]string
-type typeName = string
+type (
+	enumNames = map[crc32]string
+	typeName  = string
+)
 
 type Registry interface {
 	ConstructObject(code crc32) (Object, bool)
@@ -98,7 +100,6 @@ func RegisterEnum[T Object](r *ObjectRegistry, enums ...T) {
 	if len(enums) == 0 {
 		panic("no enums provided")
 	}
-
 
 	enums = slices.SortFunc(enums, func(a, b T) int { return cmp.Compare(a.CRC(), b.CRC()) })
 

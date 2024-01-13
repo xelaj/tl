@@ -1,3 +1,8 @@
+// Copyright (c) 2022-2024 Xelaj Software
+//
+// This file is a part of tl package.
+// See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
+
 package gen
 
 import (
@@ -5,6 +10,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+
 	"github.com/xelaj/tl/cmd/tlgen/codegen"
 	"github.com/xelaj/tl/cmd/tlgen/util"
 	"github.com/xelaj/tl/schema"

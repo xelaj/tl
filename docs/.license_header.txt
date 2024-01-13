@@ -1,4 +1,4 @@
-Copyright (c) 2022 {{ OWNER_COMPANY }}
+Copyright (c) 2022-2024 {{ OWNER_COMPANY }}
 
-This file is a part of tl package.
+This file is a part of {{ PACKAGE_NAME }} package.
 See {{ LICENSE_URL }} for details.

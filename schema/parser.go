@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Xelaj Software
+// Copyright (c) 2022-2024 Xelaj Software
 //
 // This file is a part of tl package.
 // See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
@@ -130,7 +130,7 @@ func normalizeCombinator(
 	crcStr := parts[1]
 
 	// same: lexer handles everything already
-	crc, err := strconv.ParseUint(crcStr, 16, 32) //nolint:gomnd // obvious
+	crc, err := strconv.ParseUint(crcStr, 16, 32)
 	if err != nil {
 		panic(err)
 	}

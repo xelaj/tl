@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Xelaj Software
+// Copyright (c) 2022-2024 Xelaj Software
 //
 // This file is a part of tl package.
 // See https://github.com/xelaj/tl/blob/master/LICENSE_README.md for details.
@@ -32,7 +32,6 @@ func TestParseFile(t *testing.T) {
 			Enums: map[ObjName]EnumObjects{
 				{Name: "CoolEnumerate"}: {
 					Objects: []Object{{
-
 						Name:   ObjName{Name: "someEnum"},
 						CRC:    0x5508ec75,
 						Fields: []Parameter{},

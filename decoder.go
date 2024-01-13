@@ -142,6 +142,9 @@ func (d *decoder) decodeValue(value reflect.Value) error {
 	case reflect.Float64:
 		val, err = d.popDouble()
 
+	case reflect.Uint64:
+		val, err = d.popUint()
+
 	case reflect.Int64:
 		val, err = d.PopLong()
 
@@ -481,7 +484,7 @@ func (d *decoder) PopInt() (int32, error) {
 	return int32(binary.LittleEndian.Uint32(val)), nil
 }
 
-func (d *decoder) PopLong() (int64, error) {
+func (d *decoder) popUint() (uint64, error) {
 	val, err := d.Peek(0, LongLen)
 	if err != nil {
 		return 0, err
@@ -489,12 +492,13 @@ func (d *decoder) PopLong() (int64, error) {
 
 	d.SkipBytes(LongLen)
 
-	return int64(binary.LittleEndian.Uint64(val)), nil
+	return binary.LittleEndian.Uint64(val), nil
 }
 
 // popCRC just an alias for self documenting code.
 func (d *decoder) PopCRC() (crc32, error)   { return d.PopUint() }
 func (d *decoder) PopUint() (uint32, error) { return convertNumErr[uint32](d.PopInt()) }
+func (d *decoder) PopLong() (int64, error)  { u, err := d.popUint(); return int64(u), err }
 
 func (d *decoder) popDouble() (float64, error) {
 	val, err := d.PopLong()

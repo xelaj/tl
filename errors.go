@@ -54,8 +54,8 @@ func (e ErrUnsupportedType) Error() string { //cover:ignore
 	switch k := e.Type.Kind(); k {
 	// supported, but TL doesn't support 8 and 16 bit numbers
 	case reflect.Int, reflect.Int8, reflect.Int16,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint64:
-		return fmt.Sprintf("int32, int64 or uint32 allowed, %v is unsupported by protocol", k)
+		reflect.Uint, reflect.Uint8, reflect.Uint16:
+		return fmt.Sprintf("int32, int64, uint32 or uint64 allowed, %v is unsupported by protocol", k)
 
 	// same: supported, but not in TL, so we can't understand, how much bytes
 	// we need to scan.

@@ -122,6 +122,9 @@ func (e *encoder) encodeValue(value reflect.Value) error {
 	case reflect.Int32:
 		return e.putUint(uint32(value.Int()))
 
+	case reflect.Uint64:
+		return e.putULong(value.Uint())
+
 	case reflect.Int64:
 		return e.PutLong(value.Int())
 
@@ -330,6 +333,7 @@ func (e *encoder) encodeVector(slice reflect.Value) error {
 }
 
 func (e *encoder) putUint(v uint32) error    { return e.writeErr(u32b(e.endianess, v)) }
+func (e *encoder) putULong(v uint64) error   { return e.writeErr(u64b(e.endianess, v)) }
 func (e *encoder) PutLong(v int64) error     { return e.writeErr(u64b(e.endianess, uint64(v))) }
 func (e *encoder) putDouble(v float64) error { return e.writeErr(f64b(e.endianess, v)) }
 func (e *encoder) PutCRC(v uint32) error     { return e.putUint(v) } // for selfdoc code

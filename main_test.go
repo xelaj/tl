@@ -35,6 +35,7 @@ func tearup() {
 	RegisterObjectDefault[*InvokeWithLayerParams]()
 	RegisterObjectDefault[*InitConnectionParams]()
 	RegisterObjectDefault[*ResPQ]()
+	RegisterObjectDefault[*ResPQRaw]()
 	RegisterObjectDefault[*AnyStructWithAnyType]()
 	RegisterObjectDefault[*AnyStructWithAnyObject]()
 	RegisterObjectDefault[*Poll]()

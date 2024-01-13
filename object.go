@@ -15,6 +15,7 @@ type crc32 = uint32
 
 //nolint:gochecknoglobals // types must be global
 var (
+	byteTyp        = reflect.TypeOf((*byte)(nil)).Elem()
 	byteSliceTyp   = reflect.TypeOf((*[]byte)(nil)).Elem()
 	objectTyp      = reflect.TypeOf((*Object)(nil)).Elem()
 	unmarshalerTyp = reflect.TypeOf((*Unmarshaler)(nil)).Elem()

@@ -270,7 +270,8 @@ func TestDecode(t *testing.T) {
 					0x03, 0x66, 0xb1, 0x1f, 0xdd, 0x95, 0xe4, 0x35, 0x1c, 0xe2, 0xb5, 0x9c, 0x9e, 0xca, 0x3d, 0x76,
 				},
 			},
-		}} {
+		},
+	} {
 		t.Run(tt.Name(), tt.Run)
 	}
 }
@@ -362,6 +363,17 @@ func TestEncode(t *testing.T) {
 			Fingerprints: []int64{322, 1337},
 		},
 		want: Hexed("632416050000000000000000000000000000007B00000000000000000000" +
+			"0000000001410301020315C4B51C0200000042010000000000003905000000000000"),
+		wantErr: assert.NoError,
+	}, {
+		name: "respq_raw",
+		obj: &ResPQRaw{
+			Nonce:        [16]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b},
+			ServerNonce:  [16]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x41},
+			Pq:           []byte{1, 2, 3},
+			Fingerprints: []int64{322, 1337},
+		},
+		want: Hexed("642416050000000000000000000000000000007B00000000000000000000" +
 			"0000000001410301020315C4B51C0200000042010000000000003905000000000000"),
 		wantErr: assert.NoError,
 	}, {
@@ -487,6 +499,14 @@ func TestEquality(t *testing.T) {
 				MsgID:          1234,
 				IsSpecificType: true,
 				Msg:            []int64{1, 3, 5, 7},
+			},
+		}, TcaseEquality[ResPQRaw]{
+			name: "respq_raw",
+			obj: ResPQRaw{
+				Nonce:        [16]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b},
+				ServerNonce:  [16]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x41},
+				Pq:           []byte{1, 2, 3},
+				Fingerprints: []int64{322, 1337},
 			},
 		},
 	} {

@@ -176,6 +176,10 @@ func (d *decoder) decodeValue(value reflect.Value) error {
 		}
 
 	case reflect.Array:
+		if value.Type().Elem() == byteTyp { // [N]byte
+			return d.decodeRaw(value)
+		}
+
 		return d.decodeVector(value, false)
 
 	// complex types
@@ -214,6 +218,33 @@ func (d *decoder) decodeValue(value reflect.Value) error {
 
 	v := reflect.ValueOf(&val).Elem().Elem()
 	value.Set(v)
+
+	return nil
+}
+
+func (d *decoder) decodeRaw(v reflect.Value) error {
+	if v.Kind() != reflect.Array {
+		panic("raw must be array")
+	} else if v.Type().Elem() != byteTyp {
+		panic("raw must be array of bytes")
+	} else if n := v.Len(); n%WordLen != 0 {
+		// special case: this means that we want to take exact N of bytes and pop it from reader
+		// n%WordLen == 0, cause we can't read less or more than word
+		return fmt.Errorf("array of bytes must be divided by %v, got %v", WordLen, n)
+	}
+
+	val, err := d.Peek(0, v.Len())
+	if err != nil {
+		return err
+	}
+	d.SkipBytes(v.Len())
+
+	valRaw := reflect.ValueOf(&val).Elem()
+	arr := reflect.New(reflect.ArrayOf(v.Len(), byteTyp)).Elem()
+	for i := 0; i < v.Len(); i++ {
+		arr.Index(i).Set(valRaw.Index(i))
+	}
+	v.Set(arr)
 
 	return nil
 }
@@ -487,9 +518,9 @@ func (d *decoder) PopBool() (bool, error) {
 	}
 }
 
-
 // https://core.telegram.org/type/bytes
 func (d *decoder) popString() (string, error) { return convertStrErr[string](d.PopMessage()) }
+
 func (d *decoder) PopMessage() ([]byte, error) {
 	readLen := 1
 	buf, err := d.Peek(0, 1)
@@ -544,7 +575,7 @@ func (d *decoder) PopMessage() ([]byte, error) {
 // "recommended" to zip large messages from client side, but telegram
 // is... Telegram, so it might argue sometimes. But in any case, it
 // makes no sense to implement mtproto extension of "classic" tl
-// serialization as required component)
+// serialization as required component).
 func (d *decoder) popZip(ignoreCRC bool) (io.ReadCloser, error) {
 	if !ignoreCRC {
 		gotCrc, err := d.PopCRC()

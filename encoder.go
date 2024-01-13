@@ -140,10 +140,16 @@ func (e *encoder) encodeValue(value reflect.Value) error {
 	case reflect.Ptr, reflect.Interface:
 		return e.encodeValue(value.Elem())
 
-	//case reflect.Map:
+	// case reflect.Map:
 	//	return e.encodeMap(value)
 
 	case reflect.Slice:
+		return e.encodeVector(value)
+	case reflect.Array:
+		if value.Type().Elem() == byteTyp { // [N]byte
+			return e.encodeRaw(value)
+		}
+
 		return e.encodeVector(value)
 
 	default:
@@ -283,6 +289,22 @@ func (e *encoder) encodeMap(m reflect.Value) error {
 	return nil
 }
 */
+
+func (e *encoder) encodeRaw(v reflect.Value) error {
+	if v.Kind() != reflect.Array {
+		panic("raw must be array")
+	} else if v.Type().Elem() != byteTyp {
+		panic("raw must be array of bytes")
+	} else if n := v.Len(); n%WordLen != 0 {
+		// special case: this means that we want to take exact N of bytes and pop it from reader
+		// n%WordLen == 0, cause we can't read less or more than word
+		return fmt.Errorf("array of bytes must be divided by %v, got %v", WordLen, n)
+	}
+
+	_, err := e.Write(v.Slice(0, v.Len()).Interface().([]byte))
+
+	return err
+}
 
 func (e *encoder) encodeVector(slice reflect.Value) error {
 	if b, ok := slice.Interface().([]byte); ok {

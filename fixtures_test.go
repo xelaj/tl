@@ -221,6 +221,15 @@ type ResPQ struct {
 
 func (*ResPQ) CRC() uint32 { return 0x05162463 }
 
+type ResPQRaw struct {
+	Nonce        [16]byte
+	ServerNonce  [16]byte
+	Pq           []byte
+	Fingerprints []int64
+}
+
+func (*ResPQRaw) CRC() uint32 { return 0x05162464 }
+
 // issue #59 fixtures
 
 type Poll struct {
@@ -251,6 +260,5 @@ type DHParamsOk struct {
 	ServerNonce     *Int128
 	EncryptedAnswer []byte
 }
-
 
 func (*DHParamsOk) CRC() uint32 { return 0xd0e8075c }

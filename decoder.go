@@ -558,12 +558,15 @@ func (d *decoder) PopMessage() ([]byte, error) {
 		realSize = int(d.endianess.Uint32(lenBuf))
 	}
 
+	d.SkipBytes(readLen)
+
 	// this buf wil be real message
-	buf, err = d.Peek(readLen, realSize)
-	if err != nil {
+	buf = make([]byte, realSize)
+	if _, err := io.ReadFull(&d.r, buf); err != nil {
 		return nil, fmt.Errorf("reading message data with len of %v: %w", realSize, err)
 	}
-	d.SkipBytes(readLen + realSize + pad(readLen+realSize, WordLen))
+
+	d.SkipBytes(pad(readLen+realSize, WordLen))
 
 	return buf, nil
 }

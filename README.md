@@ -234,7 +234,7 @@ IHRvbyBibGluZCB0byBzZWU=
 --------------------------------------------------------------------------------
 
 <p align=center><sub><sub>
-Created with love 💜 and magic 🦄 </br> Xelaj Software, 2022
+Created with love 💜 and magic 🦄 </br> Xelaj Software, 2022-2024
 </sub></sub></p>
 
 [mtproto]:       https://github.com/xelaj/mtproto

@@ -220,7 +220,7 @@ func (d *decoder) decodeValue(value reflect.Value) error {
 	}
 
 	v := reflect.ValueOf(&val).Elem().Elem()
-	value.Set(v)
+	value.Set(v.Convert(value.Type()))
 
 	return nil
 }

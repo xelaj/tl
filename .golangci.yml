@@ -76,6 +76,15 @@ linters-settings:
   ireturn:
     reject:
       - anon
+  forbidigo:
+    forbid:
+      - p: ^os\.ReadFile$
+        pkg: ^os$
+        msg: >-
+          os related functions are allowed only via abstractions. Please, use
+          io/fs package.
+    exclude-godoc-examples: true
+    analyze-types: true
 
 issues:
   fix: true
